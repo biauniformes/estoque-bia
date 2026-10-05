@@ -297,6 +297,43 @@ async function main() {
   await expectError("após a limpeza: auditoria volta a ser imutável", () => db.exec("delete from audit_logs"), /REGISTRO_IMUTAVEL/);
   await expectError("após a limpeza: saldo segue protegido", () => db.exec("update stock_balances set quantidade = 99"), /SALDO_PROTEGIDO/);
 
+
+  console.log("\nContagem inicial (lote, somente admin)");
+  await db.exec("reset role");
+  await db.exec("insert into products (codigo,nome,categoria,valor_unitario) values ('200.001.00','Camisa A','camisetas',10), ('200.002.00','Camisa B','camisetas',25.5)");
+  await db.exec("insert into product_variants (product_id,cor,tamanho,sku) select id,'Único','Único',codigo from products where codigo like '200.%'");
+  const CA = await variantId("200.001.00");
+  const CB = await variantId("200.002.00");
+  const lote = (items: { variant_id: string; quantidade: number }[], key: string) =>
+    rows("select public.register_initial_count($1::jsonb,$2,'1.1.1.1','ua') as r", [JSON.stringify(items), key]).then((r) => (r[0] as { r: Record<string, any> }).r);
+
+  await as(OP1);
+  await expectError("operador não lança contagem inicial", () => lote([{ variant_id: CA, quantidade: 5 }], "lote-op-0001"), /SEM_PERMISSAO/);
+  await expectError("motivo 'contagem_inicial' não vale na entrada comum", () => mov(OP1, CA, "entrada", 5, "contagem_inicial", null, "key-ci-op-0001"), /MOTIVO_INVALIDO|SEM_PERMISSAO/);
+  await as(ADMIN);
+  await expectError("admin também não usa o motivo na entrada comum", () => mov(ADMIN, CA, "entrada", 5, "contagem_inicial", null, "key-ci-adm-001"), /MOTIVO_INVALIDO/);
+
+  const lt1 = await lote([{ variant_id: CA, quantidade: 100 }, { variant_id: CB, quantidade: 40 }], "lote-0001-abcd");
+  ok("lote lança 2 itens: 140 peças, R$ 2.020,00", lt1.lancados === 2 && Number(lt1.pecas) === 140 && Number(lt1.valor) === 2020, JSON.stringify(lt1));
+  ok("saldos atualizados", (await stock(CA)) === 100 && (await stock(CB)) === 40);
+  const mv = (await rows<Record<string, any>>("select motivo, observacao, user_nome, tipo from stock_movements where product_variant_id=$1 and motivo='contagem_inicial'", [CA]))[0];
+  ok("movimentação registrada como Contagem inicial (entrada) pelo admin", mv.tipo === "entrada" && mv.user_nome === "Administrador 1" && mv.observacao === "Contagem inicial", JSON.stringify(mv));
+
+  const lt2 = await lote([{ variant_id: CA, quantidade: 100 }, { variant_id: CB, quantidade: 40 }], "lote-0001-abcd");
+  ok("reenviar o mesmo lote não duplica (repetidos=2, saldo igual)", lt2.lancados === 0 && lt2.repetidos === 2 && (await stock(CA)) === 100 && (await stock(CB)) === 40, JSON.stringify(lt2));
+
+  await expectError("lote com item inválido desfaz TUDO (tudo ou nada)", () =>
+    lote([{ variant_id: CA, quantidade: 7 }, { variant_id: "11111111-1111-1111-1111-111111111111", quantidade: 3 }], "lote-0002-abcd"), /PRODUTO_INEXISTENTE/);
+  ok("saldo de CA continua 100 após lote que falhou", (await stock(CA)) === 100);
+  await expectError("quantidade 0 no lote", () => lote([{ variant_id: CA, quantidade: 0 }], "lote-0003-abcd"), /QUANTIDADE_INVALIDA/);
+  await expectError("lote vazio", () => lote([], "lote-0004-abcd"), /LOTE_VAZIO/);
+  await expectError("sem chave", () => lote([{ variant_id: CA, quantidade: 1 }], ""), /CHAVE_OBRIGATORIA/);
+
+  const dd = (await rows<{ d: Record<string, any> }>("select public.dashboard_summary() as d"))[0].d;
+  ok("dashboard: estoque 150 (10+100+40), valor R$ 2.250,00 e 'entradas hoje' ignora a contagem",
+    dd.estoque_total === 150 && Number(dd.valor_total) === 2250 && dd.entradas_hoje === 10, JSON.stringify(dd));
+  ok("auditoria do lote registrada", (await rows("select 1 from audit_logs where action='contagem_inicial'")).length === 1);
+
   console.log(`\n${passed} ok, ${failed} falhas`);
   process.exit(failed ? 1 : 0);
 }

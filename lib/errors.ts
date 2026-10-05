@@ -20,6 +20,8 @@ const MESSAGES: Record<string, string> = {
   SEM_DIFERENCA: "A quantidade informada já é a quantidade efetiva.",
   ULTIMO_ADMIN: "Deve existir pelo menos um administrador ativo.",
   SALDO_PROTEGIDO: "O saldo não pode ser alterado diretamente.",
+  LOTE_VAZIO: "Preencha ao menos uma quantidade.",
+  LOTE_GRANDE: "No máximo 1000 itens por lançamento.",
   REGISTRO_IMUTAVEL: "Movimentações e auditoria não podem ser editadas ou apagadas.",
 };
 

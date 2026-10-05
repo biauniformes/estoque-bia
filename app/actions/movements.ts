@@ -6,6 +6,7 @@ import { getRequestMeta } from "@/lib/request-meta";
 import { dbErrorToResult } from "@/lib/errors";
 import { requireAdmin, requireUser } from "@/lib/auth/session";
 import { correctionSchema, movementSchema, type MovementInput } from "@/lib/validations/movement";
+import { z } from "zod";
 import type { ActionResult, MovementResult } from "@/types";
 
 function refresh() {
@@ -96,4 +97,44 @@ export async function correctMovementAction(input: {
   if (error) return dbErrorToResult(error);
   refresh();
   return { ok: true, data: data as MovementResult };
+}
+
+const countSchema = z.object({
+  key: z.string().min(8).max(100),
+  items: z
+    .array(
+      z.object({
+        variantId: z.string().uuid(),
+        quantidade: z.number().int().min(1, "Quantidade inválida.").max(1_000_000, "Quantidade acima do limite."),
+      }),
+    )
+    .min(1, "Preencha ao menos uma quantidade.")
+    .max(1000, "No máximo 1000 itens por lançamento."),
+});
+
+export type CountResult = { lancados: number; repetidos: number; pecas: number; valor: number };
+
+/** Contagem inicial em lote (somente administrador). Tudo ou nada, com chave anti-duplicidade. */
+export async function registerInitialCountAction(input: {
+  key: string;
+  items: { variantId: string; quantidade: number }[];
+}): Promise<ActionResult<CountResult>> {
+  await requireAdmin();
+  const parsed = countSchema.safeParse(input);
+  if (!parsed.success) return { ok: false, error: parsed.error.issues[0].message, code: "VALIDACAO" };
+  const ids = new Set(parsed.data.items.map((i) => i.variantId));
+  if (ids.size !== parsed.data.items.length) return { ok: false, error: "Há itens repetidos no lote.", code: "VALIDACAO" };
+
+  const supabase = await createClient();
+  const meta = await getRequestMeta();
+  const { data, error } = await supabase.rpc("register_initial_count", {
+    p_items: parsed.data.items.map((i) => ({ variant_id: i.variantId, quantidade: i.quantidade })),
+    p_batch_key: parsed.data.key,
+    p_ip: meta.ip,
+    p_ua: meta.ua,
+  });
+  if (error) return dbErrorToResult(error);
+  refresh();
+  revalidatePath("/contagem");
+  return { ok: true, data: data as CountResult };
 }

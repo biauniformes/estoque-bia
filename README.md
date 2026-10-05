@@ -65,8 +65,9 @@ Execute **em ordem** no **SQL Editor** do Supabase (ou com `supabase db push` se
 2. `supabase/migrations/0002_functions.sql` — views, auditoria automática, `register_movement`, `correct_movement`, resumos
 3. `supabase/migrations/0003_rls_grants.sql` — RLS, policies e privilégios
 4. `supabase/migrations/0004_valor_unitario.sql` — valor unitário por produto, valor total em estoque (visível só a administradores) e auditoria de exportações
+5. `supabase/migrations/0005_contagem_inicial.sql` — motivo "Contagem inicial" e lançamento em lote
 
-`supabase/setup_completo.sql` reúne 0001–0004 num arquivo só (instalação nova, **sem** dados fictícios).
+`supabase/setup_completo.sql` reúne 0001–0005 num arquivo só (instalação nova, **sem** dados fictícios).
 `supabase/seed/01_catalog.sql` é um catálogo fictício **opcional**, só para demonstração.
 
 ## Importar o catálogo real (planilha) e remover os dados fictícios
@@ -76,11 +77,13 @@ Execute **em ordem** no **SQL Editor** do Supabase (ou com `supabase db push` se
 2. **Importar os itens** da planilha do sistema (código, nome e valor unitário; a quantidade é ignorada — o estoque começa em 0):
 
 ```bash
-npm run import:itens -- "C:\caminhoelatório de estoque.xlsx" --simular   # só mostra o que faria
-npm run import:itens -- "C:\caminhoelatório de estoque.xlsx"             # importa
+npm run import:itens -- "C:\caminho
+elatório de estoque.xlsx" --simular   # só mostra o que faria
+npm run import:itens -- "C:\caminho
+elatório de estoque.xlsx"             # importa
 ```
 Pode ser repetido: itens novos são criados e nome/valor dos existentes são atualizados (saldo e histórico nunca mudam).
-3. Lance as quantidades em **Entrada** (motivo sugerido: *Outros* + observação "Contagem inicial").
+3. Lance as quantidades na tela **Contagem inicial** (somente administrador): digite as quantidades da tabela e clique em *Lançar contagem*. Cada item preenchido vira uma entrada com o motivo "Contagem inicial"; o lote é tudo-ou-nada e protegido contra duplicidade; o rascunho fica salvo no aparelho.
 
 ## Relatórios (Excel)
 

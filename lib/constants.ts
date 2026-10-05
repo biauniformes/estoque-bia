@@ -40,6 +40,7 @@ export type Reason =
   | "avaria"
   | "ajuste_negativo"
   | "correcao"
+  | "contagem_inicial"
   | "outros";
 
 export const REASON_LABELS: Record<string, string> = {
@@ -52,6 +53,7 @@ export const REASON_LABELS: Record<string, string> = {
   avaria: "Avaria",
   ajuste_negativo: "Ajuste",
   correcao: "Correção",
+  contagem_inicial: "Contagem inicial",
   outros: "Outros",
 };
 
@@ -85,6 +87,7 @@ export const AUDIT_ACTION_LABELS: Record<string, string> = {
   criacao_usuario: "Usuário cadastrado por administrador",
   senha_redefinida: "Senha redefinida por administrador",
   exportacao_relatorio: "Relatório exportado",
+  contagem_inicial: "Contagem inicial lançada",
   importacao_catalogo: "Catálogo importado",
   limpeza_dados_demonstracao: "Dados de demonstração removidos",
 };
