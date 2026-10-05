@@ -36,6 +36,7 @@ export async function saveProductAction(_prev: FormState, formData: FormData): P
     nome: formData.get("nome"),
     categoria: formData.get("categoria"),
     descricao: formData.get("descricao") ?? "",
+    valor_unitario: formData.get("valor_unitario") ?? 0,
   });
   if (!parsed.success) return fail(parsed.error.issues);
 
@@ -46,35 +47,32 @@ export async function saveProductAction(_prev: FormState, formData: FormData): P
     if (!isUuid(id)) return { ok: false, error: "Produto inválido." };
     const { error } = await supabase
       .from("products")
-      .update({ codigo: p.codigo, nome: p.nome, categoria: p.categoria, descricao: p.descricao || null })
+      .update({ codigo: p.codigo, nome: p.nome, categoria: p.categoria, descricao: p.descricao || null, valor_unitario: p.valor_unitario })
       .eq("id", id);
     if (error) return dbErrorToResult(error);
     refresh();
     return { ok: true, data: undefined, message: "Produto atualizado." };
   }
 
-  const wantsVariant = String(formData.get("cor") ?? "").trim() !== "" || String(formData.get("tamanho") ?? "").trim() !== "";
-  let variant: ReturnType<typeof variantSchema.parse> | null = null;
-  if (wantsVariant) {
-    const v = variantSchema.safeParse({
-      cor: formData.get("cor"),
-      tamanho: formData.get("tamanho"),
-      modelo: formData.get("modelo") ?? "",
-      sku: formData.get("sku") ?? "",
-      estoque_minimo: formData.get("estoque_minimo") || 0,
-    });
-    if (!v.success) return fail(v.error.issues);
-    variant = v.data;
-  }
+  // todo produto nasce com ao menos uma variação; sem cor/tamanho informados vira "Único"
+  const v = variantSchema.safeParse({
+    cor: String(formData.get("cor") ?? "").trim() || "Único",
+    tamanho: String(formData.get("tamanho") ?? "").trim() || "Único",
+    modelo: formData.get("modelo") ?? "",
+    sku: formData.get("sku") ?? "",
+    estoque_minimo: formData.get("estoque_minimo") || 0,
+  });
+  if (!v.success) return fail(v.error.issues);
+  const variant = v.data;
 
   const { data: created, error } = await supabase
     .from("products")
-    .insert({ codigo: p.codigo, nome: p.nome, categoria: p.categoria, descricao: p.descricao || null })
+    .insert({ codigo: p.codigo, nome: p.nome, categoria: p.categoria, descricao: p.descricao || null, valor_unitario: p.valor_unitario })
     .select("id")
     .single();
   if (error || !created) return dbErrorToResult(error ?? { message: "erro" });
 
-  if (variant) {
+  {
     const { error: vErr } = await supabase.from("product_variants").insert({
       product_id: created.id,
       cor: variant.cor,

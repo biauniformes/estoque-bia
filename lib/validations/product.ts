@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { CATEGORIES } from "@/lib/constants";
+import { parseMoney } from "@/lib/utils";
 
 const categories = CATEGORIES.map((c) => c.value) as [string, ...string[]];
 
@@ -8,6 +9,10 @@ export const productSchema = z.object({
   nome: z.string().trim().min(2, "Informe o nome.").max(120),
   categoria: z.enum(categories, { error: "Selecione a categoria." }),
   descricao: z.string().trim().max(500, "Máximo 500 caracteres.").default(""),
+  valor_unitario: z.preprocess(
+    parseMoney,
+    z.number({ error: "Informe um valor válido (ex.: 19,90)." }).min(0, "Não pode ser negativo.").max(1_000_000, "Valor muito alto."),
+  ),
 });
 
 export const variantSchema = z.object({
@@ -18,8 +23,10 @@ export const variantSchema = z.object({
   estoque_minimo: z.coerce.number({ error: "Informe um número." }).int("Número inteiro.").min(0, "Não pode ser negativo.").max(1_000_000).default(0),
 });
 
-/** SKU automático: CODIGO-COR3-TAMANHO (sem acentos). */
+/** SKU automático: CODIGO-COR3-TAMANHO (sem acentos). Item sem variação (Único): o próprio código. */
 export function makeSku(codigo: string, cor: string, tamanho: string) {
+  const unico = (s: string) => ["unico", "-", ""].includes(s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim().toLowerCase());
+  if (unico(cor) && unico(tamanho)) return codigo.trim().toUpperCase();
   const clean = (s: string) =>
     s
       .normalize("NFD")

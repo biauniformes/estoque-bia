@@ -5,7 +5,7 @@ import { requireUser } from "@/lib/auth/session";
 import { getStockRow, getVariantSummary } from "@/services/stock";
 import { listMovements } from "@/services/movements";
 import { categoryLabel, REASON_LABELS } from "@/lib/constants";
-import { formatDateTime, formatNumber, isUuid, signed } from "@/lib/utils";
+import { formatDateTime, formatNumber, isUuid, signed, variantLabel } from "@/lib/utils";
 import { PageHeader, StatCard } from "@/components/shared/page-header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -31,7 +31,7 @@ export default async function VariantDetailPage({ params }: { params: Promise<{ 
     <>
       <PageHeader
         title={row.produto}
-        description={`${categoryLabel(row.categoria)} · ${row.cor} / ${row.tamanho} · SKU ${row.sku}`}
+        description={[categoryLabel(row.categoria), variantLabel(row.cor, row.tamanho), `Código ${row.sku}`].filter(Boolean).join(" · ")}
         actions={
           <>
             <Button asChild variant="entrada" size="lg">
@@ -50,7 +50,7 @@ export default async function VariantDetailPage({ params }: { params: Promise<{ 
           <div>
             <p className="text-lg font-extrabold">{row.status === "zerado" ? "Estoque zerado" : "Estoque baixo"}</p>
             <p>
-              {row.produto} — {row.cor} — {row.tamanho} · Estoque atual: <strong>{formatNumber(row.estoque)}</strong> · Estoque mínimo:{" "}
+              {row.produto}{variantLabel(row.cor, row.tamanho) && ` — ${variantLabel(row.cor, row.tamanho)}`} · Estoque atual: <strong>{formatNumber(row.estoque)}</strong> · Estoque mínimo:{" "}
               <strong>{formatNumber(row.estoque_minimo)}</strong>
             </p>
           </div>

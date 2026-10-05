@@ -84,6 +84,9 @@ export const AUDIT_ACTION_LABELS: Record<string, string> = {
   permissao_alterada: "Permissão alterada",
   criacao_usuario: "Usuário cadastrado por administrador",
   senha_redefinida: "Senha redefinida por administrador",
+  exportacao_relatorio: "Relatório exportado",
+  importacao_catalogo: "Catálogo importado",
+  limpeza_dados_demonstracao: "Dados de demonstração removidos",
 };
 
 export const PAGE_SIZE = 25;

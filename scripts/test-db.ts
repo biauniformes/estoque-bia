@@ -261,6 +261,42 @@ async function main() {
   const vs = (await rows<{ s: Record<string, any> }>("select public.variant_summary($1) as s", [JAQ]))[0].s;
   ok("variant_summary: entradas 42 / saídas 30", vs.entradas === 42 && vs.saidas === 30 && vs.estoque === 12, JSON.stringify(vs));
 
+  console.log("\nValor unitário e valor em estoque");
+  await as(ADMIN);
+  await db.exec("update products set valor_unitario = 19.9 where codigo = 'JAQ-001'");
+  const ov = (await rows<Record<string, any>>("select estoque, valor_unitario, valor_total from stock_overview where sku='JAQ-001-AZU-G'"))[0];
+  ok("admin vê valor unitário e total (12 un. x 19,90 = 238,80)", Number(ov.valor_unitario) === 19.9 && Number(ov.valor_total) === 238.8, JSON.stringify(ov));
+  await as(OP2);
+  const ovOp = (await rows<Record<string, any>>("select estoque, valor_unitario, valor_total from stock_overview where sku='JAQ-001-AZU-G'"))[0];
+  ok("operador NÃO vê valores (null)", ovOp.valor_unitario === null && ovOp.valor_total === null && ovOp.estoque === 12);
+  await as(ADMIN);
+  const d2 = (await rows<{ d: Record<string, any> }>("select public.dashboard_summary() as d"))[0].d;
+  ok("dashboard: valor_total = 12 x 19,90 = 238,80 e estoque_total = 57", Number(d2.valor_total) === 238.8 && d2.estoque_total === 57, JSON.stringify(d2));
+  await expectError("valor negativo bloqueado", () => db.exec("update products set valor_unitario = -1 where codigo = 'JAQ-001'"), /check|violates/i);
+  ok("alteração de valor auditada", (await rows("select 1 from audit_logs where action='produto_alterado' and metadata->'alteracoes' ? 'valor_unitario'")).length === 1);
+
+  console.log("\nLimpeza dos dados de demonstração");
+  await db.exec("reset role");
+  await db.exec(`insert into auth.users (id, email, raw_user_meta_data) values ('00000000-0000-0000-0000-0000000000c1','velho@stockuniformes.demo','{"nome":"Velho Demo"}')`);
+  await db.exec(readFileSync(join(root, "supabase", "manutencao", "limpar_dados_demonstracao.sql"), "utf8"));
+  const cnt = (await rows<Record<string, number>>(
+    `select (select count(*) from products)::int p, (select count(*) from product_variants)::int v,
+            (select count(*) from stock_movements)::int m, (select count(*) from stock_balances)::int b,
+            (select count(*) from profiles)::int u, (select count(*) from audit_logs)::int a`))[0];
+  ok("produtos, variações, movimentações e saldos zerados", cnt.p === 0 && cnt.v === 0 && cnt.m === 0 && cnt.b === 0, JSON.stringify(cnt));
+  ok("contas reais mantidas; conta demo removida", cnt.u === 4, JSON.stringify(cnt));
+  ok("auditoria limpa, com 1 registro da limpeza", cnt.a === 1);
+  await db.exec("insert into products (codigo,nome,categoria,valor_unitario) values ('100.301.00','Avental Teste','outros',23)");
+  await db.exec("insert into product_variants (product_id,cor,tamanho,sku) select id,'Único','Único','100.301.00' from products");
+  const nv = await variantId("100.301.00");
+  await as(ADMIN);
+  const rr = await mov(ADMIN, nv, "entrada", 10, "producao", null, "key-pos-limpeza-1");
+  ok("após a limpeza: entrada de 10 funciona (saldo 10)", rr.estoque_posterior === 10 && (await stock(nv)) === 10);
+  await db.exec("reset role");
+  await expectError("após a limpeza: histórico volta a ser imutável", () => db.exec("delete from stock_movements"), /REGISTRO_IMUTAVEL/);
+  await expectError("após a limpeza: auditoria volta a ser imutável", () => db.exec("delete from audit_logs"), /REGISTRO_IMUTAVEL/);
+  await expectError("após a limpeza: saldo segue protegido", () => db.exec("update stock_balances set quantidade = 99"), /SALDO_PROTEGIDO/);
+
   console.log(`\n${passed} ok, ${failed} falhas`);
   process.exit(failed ? 1 : 0);
 }

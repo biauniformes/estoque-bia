@@ -74,3 +74,24 @@ export const isUuid = (v: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a
 export function normalizeOc(v: string) {
   return v.trim().toUpperCase().replace(/^OC[\s._-]*/, "");
 }
+
+const BRL = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });
+export function formatBRL(n: number | null | undefined) {
+  return BRL.format(Number(n ?? 0));
+}
+
+/** Aceita "19,90", "1.234,56", "19.9" ou número; devolve número ou NaN. */
+export function parseMoney(v: unknown): number {
+  if (typeof v === "number") return v;
+  const s = String(v ?? "").trim().replace(/[R$\s]/g, "");
+  if (!s) return 0;
+  const normalized = s.includes(",") ? s.replace(/\./g, "").replace(",", ".") : s;
+  return Number(normalized);
+}
+
+/** Itens importados têm cor/tamanho "Único": nesses casos não há o que mostrar. */
+export function variantLabel(cor: string, tamanho: string) {
+  const unico = (s: string) => ["único", "unico", "-", "—"].includes(s.trim().toLowerCase());
+  if (unico(cor) && unico(tamanho)) return "";
+  return `${cor} / ${tamanho}`;
+}

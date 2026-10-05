@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 import { requireAdmin } from "@/lib/auth/session";
 import { createClient } from "@/lib/supabase/server";
-import { isUuid, formatNumber, first } from "@/lib/utils";
+import { isUuid, formatNumber, first, variantLabel } from "@/lib/utils";
 import { PageHeader } from "@/components/shared/page-header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -79,7 +79,7 @@ export default async function ProductDetailPage({
             rowKey={(r) => r.id}
             empty={<EmptyState title="Sem variações" description="Adicione cor e tamanho para poder movimentar este produto." />}
             columns={[
-              { header: "Cor / Tam.", cell: (r) => <strong>{r.cor} / {r.tamanho}</strong> },
+              { header: "Cor / Tam.", cell: (r) => <strong>{variantLabel(r.cor, r.tamanho) || "Única"}</strong> },
               { header: "SKU", hideBelow: "md", cell: (r) => <span className="font-mono text-sm">{r.sku}</span> },
               { header: "Estoque", align: "right", cell: (r) => formatNumber(stockById.get(r.id)?.estoque ?? 0) },
               { header: "Mín.", align: "right", hideBelow: "md", cell: (r) => formatNumber(r.estoque_minimo) },
@@ -93,7 +93,7 @@ export default async function ProductDetailPage({
                 cell: (r) => (
                   <div className="flex justify-end gap-2">
                     <VariantDialog productId={p.id} variant={r} />
-                    <ActiveToggle kind="variant" id={r.id} ativo={r.ativo} label={`${r.cor} / ${r.tamanho}`} />
+                    <ActiveToggle kind="variant" id={r.id} ativo={r.ativo} label={variantLabel(r.cor, r.tamanho) || "variação única"} />
                   </div>
                 ),
               },

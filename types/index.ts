@@ -28,6 +28,9 @@ export type StockRow = {
   disponivel: number;
   status: StockStatus;
   ativo: boolean;
+  /** só administradores recebem valores (operadores: null) */
+  valor_unitario: number | null;
+  valor_total: number | null;
 };
 
 export type MovementRow = {
@@ -76,6 +79,7 @@ export type ProductRow = {
   nome: string;
   categoria: string;
   descricao: string | null;
+  valor_unitario: number;
   ativo: boolean;
   created_at: string;
   updated_at: string;

@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   ClipboardList,
+  FileSpreadsheet,
   FileText,
   LayoutDashboard,
   LogOut,
@@ -33,6 +34,7 @@ const NAV: NavItem[] = [
   { href: "/movimentacoes", label: "Movimentações", icon: ClipboardList },
   { href: "/produtos", label: "Produtos", icon: Shirt, admin: true },
   { href: "/ocs", label: "OCs", icon: FileText, admin: true },
+  { href: "/relatorios", label: "Relatórios", icon: FileSpreadsheet, admin: true },
   { href: "/usuarios", label: "Usuários", icon: Users, admin: true },
   { href: "/auditoria", label: "Auditoria", icon: ShieldCheck, admin: true },
 ];

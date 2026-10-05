@@ -1,7 +1,7 @@
 import { requireUser } from "@/lib/auth/session";
 import { listMovements, listUsersForFilter } from "@/services/movements";
 import { CATEGORIES, REASON_LABELS } from "@/lib/constants";
-import { first, formatDateTime, formatNumber, signed } from "@/lib/utils";
+import { first, formatDateTime, formatNumber, signed, variantLabel } from "@/lib/utils";
 import { PageHeader } from "@/components/shared/page-header";
 import { Card } from "@/components/ui/card";
 import { Filters, type FilterField } from "@/components/shared/filters";
@@ -66,8 +66,7 @@ export default async function MovimentacoesPage({ searchParams }: { searchParams
                 <div>
                   <p className="font-bold">{r.produto}</p>
                   <p className="text-sm text-slate-500">
-                    {r.cor} / {r.tamanho}
-                    {r.corrige_movement_id ? " · correção" : ""}
+                    {[r.codigo, variantLabel(r.cor, r.tamanho), r.corrige_movement_id ? "correção" : ""].filter(Boolean).join(" · ")}
                   </p>
                 </div>
               ),
@@ -100,7 +99,7 @@ export default async function MovimentacoesPage({ searchParams }: { searchParams
                           movementId={r.id}
                           tipo={r.tipo}
                           quantidade={r.quantidade}
-                          label={`${r.produto} ${r.cor}/${r.tamanho}`}
+                          label={`${r.produto} ${variantLabel(r.cor, r.tamanho)}`.trim()}
                         />
                       ),
                   },

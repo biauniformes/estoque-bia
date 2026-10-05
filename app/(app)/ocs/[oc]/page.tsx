@@ -4,7 +4,7 @@ import { ArrowLeft } from "lucide-react";
 import { requireAdmin } from "@/lib/auth/session";
 import { listMovements } from "@/services/movements";
 import { REASON_LABELS } from "@/lib/constants";
-import { formatDateTime, formatNumber, normalizeOc, signed } from "@/lib/utils";
+import { formatDateTime, formatNumber, normalizeOc, signed, variantLabel } from "@/lib/utils";
 import { PageHeader } from "@/components/shared/page-header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { DataTable } from "@/components/shared/data-table";
@@ -56,7 +56,7 @@ export default async function OcDetailPage({ params }: { params: Promise<{ oc: s
                 <li key={`${i.produto}${i.cor}${i.tamanho}`} className="flex items-center justify-between gap-3 py-3">
                   <span>
                     <span className="font-bold">{i.produto}</span>
-                    <span className="block text-sm text-slate-500">{i.cor} / {i.tamanho}</span>
+                    <span className="block text-sm text-slate-500">{variantLabel(i.cor, i.tamanho)}</span>
                   </span>
                   <span className="text-2xl font-extrabold tabular-nums">{formatNumber(i.total)}</span>
                 </li>
@@ -78,7 +78,7 @@ export default async function OcDetailPage({ params }: { params: Promise<{ oc: s
             rowKey={(r) => r.id}
             columns={[
               { header: "Data", cell: (r) => <span className="whitespace-nowrap">{formatDateTime(r.created_at)}</span> },
-              { header: "Produto", cell: (r) => <span><strong>{r.produto}</strong> <span className="text-slate-500">{r.cor} / {r.tamanho}</span></span> },
+              { header: "Produto", cell: (r) => <span><strong>{r.produto}</strong> <span className="text-slate-500">{variantLabel(r.cor, r.tamanho)}</span></span> },
               { header: "Movimento", hideBelow: "md", cell: (r) => <MovementBadge tipo={r.tipo} ajuste={r.motivo === "correcao"} /> },
               { header: "Qtd.", align: "right", cell: (r) => <strong className={r.tipo === "entrada" ? "text-emerald-700" : "text-rose-700"}>{signed(r.tipo, r.quantidade)}</strong> },
               { header: "Motivo", hideBelow: "lg", cell: (r) => REASON_LABELS[r.motivo] ?? r.motivo },

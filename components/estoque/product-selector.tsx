@@ -34,11 +34,15 @@ export function ProductSelector({
   const selected = products.find((p) => p.id === value) ?? null;
 
   const matches = React.useMemo(() => {
-    const t = norm(q.trim());
-    if (!t) return products.slice(0, 8);
+    const tokens = norm(q.trim()).split(/\s+/).filter(Boolean);
+    // catálogo grande: só lista após digitar; catálogo pequeno: mostra tudo para toque rápido
+    if (tokens.length === 0) return products.length <= 12 ? products : [];
     return products
-      .filter((p) => norm(`${p.nome} ${p.codigo} ${categoryLabel(p.categoria)}`).includes(t) || p.variants.some((v) => norm(v.sku).includes(t)))
-      .slice(0, 8);
+      .filter((p) => {
+        const hay = norm(`${p.nome} ${p.codigo} ${categoryLabel(p.categoria)} ${p.variants.map((v) => v.sku).join(" ")}`);
+        return tokens.every((t) => hay.includes(t));
+      })
+      .slice(0, 12);
   }, [q, products]);
 
   if (selected) {
@@ -91,12 +95,17 @@ export function ProductSelector({
             >
               <span className="text-lg font-bold text-slate-900">{p.nome}</span>
               <span className="text-sm text-slate-500">
-                {p.codigo} · {p.variants.length} {p.variants.length === 1 ? "variação" : "variações"}
+                {p.codigo}
+                {p.variants.length > 1 ? ` · ${p.variants.length} variações` : ""}
               </span>
             </button>
           </li>
         ))}
-        {matches.length === 0 && <li className="px-2 py-4 text-slate-500 sm:col-span-2">Nenhum produto encontrado para “{q}”.</li>}
+        {matches.length === 0 && (
+          <li className="px-2 py-4 text-slate-500 sm:col-span-2">
+            {q.trim() ? `Nenhum produto encontrado para “${q}”.` : "Digite o nome ou o código do produto para buscar."}
+          </li>
+        )}
       </ul>
     </div>
   );

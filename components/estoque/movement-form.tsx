@@ -12,7 +12,7 @@ import { ProductSelector, groupProducts } from "./product-selector";
 import { QuantityInput } from "./quantity-input";
 import { registerMovementAction } from "@/app/actions/movements";
 import { ENTRADA_REASONS, SAIDA_REASONS, REASON_LABELS } from "@/lib/constants";
-import { cn, formatNumber, newKey, normalizeOc } from "@/lib/utils";
+import { cn, formatNumber, newKey, normalizeOc, variantLabel } from "@/lib/utils";
 import type { MovementResult, StockRow } from "@/types";
 
 type Props = { tipo: "entrada" | "saida"; variants: StockRow[]; initialVariantId?: string };
@@ -95,7 +95,7 @@ export function MovementForm({ tipo, variants, initialVariantId }: Props) {
   const insufficient = isSaida && !!variant && n > current;
   const needsOc = isSaida && motivo === "oc";
   const ocClean = normalizeOc(oc);
-  const missing = !variant ? "Selecione produto, cor e tamanho" : n < 1 ? "Informe a quantidade" : needsOc && !ocClean ? "Informe o número da OC" : null;
+  const missing = !variant ? (product && product.variants.length > 1 ? "Selecione produto, cor e tamanho" : "Selecione o produto") : n < 1 ? "Informe a quantidade" : needsOc && !ocClean ? "Informe o número da OC" : null;
   const canSubmit = !missing && !insufficient && !pending;
 
   function pickProduct(id: string | null) {
@@ -187,8 +187,7 @@ export function MovementForm({ tipo, variants, initialVariantId }: Props) {
         </p>
         <p className="mt-4 text-2xl font-bold text-slate-900">{result.produto}</p>
         <p className="text-lg text-slate-600">
-          {result.cor} / {result.tamanho}
-          {result.oc_number ? ` · OC ${result.oc_number}` : ""}
+          {[variantLabel(result.cor, result.tamanho), result.oc_number ? `OC ${result.oc_number}` : ""].filter(Boolean).join(" · ")}
         </p>
         <p className="mt-5 rounded-2xl bg-slate-100 py-4 text-xl font-bold text-slate-800">
           {isIn ? "Estoque atual" : "Estoque restante"}: <span className="tabular-nums">{formatNumber(result.estoque_posterior)}</span>
@@ -215,7 +214,7 @@ export function MovementForm({ tipo, variants, initialVariantId }: Props) {
         {errors.variantId && <p className="text-sm font-medium text-red-600">{errors.variantId}</p>}
       </Step>
 
-      {product && (
+      {product && product.variants.length > 1 && (
         <Step n={2} title="Cor e tamanho">
           <div role="radiogroup" aria-label="Cor" className="flex flex-wrap gap-3">
             {colors.map((c) => (
@@ -253,7 +252,7 @@ export function MovementForm({ tipo, variants, initialVariantId }: Props) {
             )}
           >
             <p className="text-lg font-bold text-slate-800">
-              {variant.produto} · {variant.cor} / {variant.tamanho}
+              {variant.produto}{variantLabel(variant.cor, variant.tamanho) && ` · ${variantLabel(variant.cor, variant.tamanho)}`}
             </p>
             <p className="text-lg text-slate-700">
               Estoque atual: <strong className="text-2xl tabular-nums">{formatNumber(current)}</strong>
@@ -363,8 +362,11 @@ export function MovementForm({ tipo, variants, initialVariantId }: Props) {
         {variant && (
           <dl className="grid grid-cols-[auto_1fr] gap-x-6 gap-y-2 rounded-2xl bg-slate-50 p-4 text-lg">
             <dt className="text-slate-500">Produto</dt><dd className="font-bold">{variant.produto}</dd>
-            <dt className="text-slate-500">Cor</dt><dd className="font-bold">{variant.cor}</dd>
-            <dt className="text-slate-500">Tamanho</dt><dd className="font-bold">{variant.tamanho}</dd>
+            {variantLabel(variant.cor, variant.tamanho) && (
+              <>
+                <dt className="text-slate-500">Cor / tamanho</dt><dd className="font-bold">{variantLabel(variant.cor, variant.tamanho)}</dd>
+              </>
+            )}
             <dt className="text-slate-500">Quantidade</dt><dd className="font-extrabold tabular-nums text-rose-600">−{formatNumber(n)}</dd>
             <dt className="text-slate-500">Destino</dt><dd className="font-bold">{needsOc ? `OC ${ocClean}` : REASON_LABELS[motivo]}</dd>
             <dt className="text-slate-500">Estoque atual</dt><dd className="font-bold tabular-nums">{formatNumber(current)}</dd>

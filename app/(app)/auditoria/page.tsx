@@ -5,7 +5,7 @@ import { getRequestMeta } from "@/lib/request-meta";
 import { listMovements, listUsersForFilter } from "@/services/movements";
 import { listAuditEvents } from "@/services/audit";
 import { AUDIT_ACTION_LABELS, CATEGORIES, REASON_LABELS } from "@/lib/constants";
-import { cn, first, formatDateTime, formatNumber, signed } from "@/lib/utils";
+import { cn, first, formatDateTime, formatNumber, signed, variantLabel } from "@/lib/utils";
 import { PageHeader } from "@/components/shared/page-header";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -35,7 +35,7 @@ function MovementAuditCard({ m }: { m: MovementRow }) {
         <div>
           <p className="text-xs font-bold uppercase text-slate-500">Produto</p>
           <p className="font-bold">{m.produto}</p>
-          <p className="text-sm text-slate-600">{m.cor} / {m.tamanho}</p>
+          <p className="text-sm text-slate-600">{variantLabel(m.cor, m.tamanho) || m.codigo}</p>
         </div>
         <div>
           <p className="text-xs font-bold uppercase text-slate-500">Quantidade</p>
