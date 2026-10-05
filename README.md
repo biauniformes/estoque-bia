@@ -66,8 +66,9 @@ Execute **em ordem** no **SQL Editor** do Supabase (ou com `supabase db push` se
 3. `supabase/migrations/0003_rls_grants.sql` — RLS, policies e privilégios
 4. `supabase/migrations/0004_valor_unitario.sql` — valor unitário por produto, valor total em estoque (visível só a administradores) e auditoria de exportações
 5. `supabase/migrations/0005_contagem_inicial.sql` — motivo "Contagem inicial" e lançamento em lote
+6. `supabase/migrations/0006_ordem_tamanhos.sql` — ordena itens por modelo e tamanho (PP, P, M, G, GG, XG, G1…G5) a partir do nome
 
-`supabase/setup_completo.sql` reúne 0001–0005 num arquivo só (instalação nova, **sem** dados fictícios).
+`supabase/setup_completo.sql` reúne 0001–0006 num arquivo só (instalação nova, **sem** dados fictícios).
 `supabase/seed/01_catalog.sql` é um catálogo fictício **opcional**, só para demonstração.
 
 ## Importar o catálogo real (planilha) e remover os dados fictícios

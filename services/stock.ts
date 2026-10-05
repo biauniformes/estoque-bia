@@ -6,7 +6,7 @@ import type { StockRow } from "@/types";
 
 export type StockFilters = { q?: string; categoria?: string; cor?: string; tamanho?: string; status?: string; page?: number };
 
-const ORDER = ["produto", "cor", "tamanho_ordem", "tamanho"] as const;
+const ORDER = ["nome_base", "tamanho_rank", "produto", "cor", "tamanho_ordem", "tamanho"] as const;
 
 export async function listStock(f: StockFilters, pageSize = PAGE_SIZE) {
   const supabase = await createClient();
@@ -34,6 +34,8 @@ export async function listActiveVariants() {
     .from("stock_overview")
     .select("*")
     .eq("ativo", true)
+    .order("nome_base")
+    .order("tamanho_rank")
     .order("produto")
     .order("cor")
     .order("tamanho_ordem")

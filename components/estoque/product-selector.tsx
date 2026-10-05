@@ -15,7 +15,7 @@ export function groupProducts(variants: StockRow[]): ProductOption[] {
     cur.variants.push(v);
     map.set(v.product_id, cur);
   }
-  return [...map.values()].sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR"));
+  return [...map.values()]; // já vem ordenado pelo banco (modelo e depois tamanho: PP, P, M, G, GG…)
 }
 
 const norm = (s: string) => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();

@@ -41,6 +41,8 @@ export async function getStockSnapshot() {
       .from("stock_overview")
       .select("*")
       .eq("ativo", true)
+      .order("nome_base")
+      .order("tamanho_rank")
       .order("produto")
       .order("cor")
       .order("tamanho_ordem")

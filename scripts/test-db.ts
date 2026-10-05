@@ -334,6 +334,26 @@ async function main() {
     dd.estoque_total === 150 && Number(dd.valor_total) === 2250 && dd.entradas_hoje === 10, JSON.stringify(dd));
   ok("auditoria do lote registrada", (await rows("select 1 from audit_logs where action='contagem_inicial'")).length === 1);
 
+
+  console.log("\nOrdem por tamanho (a partir do nome)");
+  await db.exec("reset role");
+  const tamanhos = ["G", "G1", "GG", "M", "P", "PP", "XG", "G2", "G5", "G3", "G4"];
+  for (const t of tamanhos) {
+    await db.exec(`insert into products (codigo,nome,categoria,valor_unitario) values ('300.${t}','Calça Operacional Unissex C/ Elástico AZUL ${t}','calcas',48.5)`);
+  }
+  await db.exec("insert into products (codigo,nome,categoria) values ('301.1','Jaqueta Nylon PRETA - PP','jaquetas'), ('301.2','Jaqueta Nylon PRETA - M','jaquetas'), ('301.3','Jaqueta Nylon PRETA - GG','jaquetas'), ('301.4','Bota 38','outros'), ('301.5','Bota 36','outros'), ('301.6','Bota 40','outros'), ('301.7','Touca redinha','outros')");
+  await db.exec("insert into product_variants (product_id,cor,tamanho,sku) select id,'Único','Único',codigo from products where codigo like '300.%' or codigo like '301.%'");
+  await as(ADMIN);
+  const ord = (await rows<{ produto: string }>("select produto from stock_overview where codigo like '300.%' order by nome_base, tamanho_rank, produto")).map((r) => r.produto.split(" ").pop());
+  ok("calça: PP, P, M, G, GG, XG, G1, G2, G3, G4, G5", ord.join(",") === "PP,P,M,G,GG,XG,G1,G2,G3,G4,G5", ord.join(","));
+  const ord2 = (await rows<{ produto: string }>("select produto from stock_overview where codigo like '301.%' order by nome_base, tamanho_rank, produto")).map((r) => r.produto);
+  ok("jaqueta com ' - PP/M/GG' ordena PP, M, GG", ord2.filter((x) => x.startsWith("Jaqueta")).map((x) => x.split(" ").pop()).join(",") === "PP,M,GG", ord2.join("|"));
+  ok("numerais em ordem crescente (36, 38, 40)", ord2.filter((x) => x.startsWith("Bota")).join(",") === "Bota 36,Bota 38,Bota 40", ord2.join("|"));
+  const grupo = (await rows<{ nome_base: string }>("select distinct nome_base from stock_overview where codigo like '300.%'")).map((r) => r.nome_base);
+  ok("todos os tamanhos da calça caem no mesmo grupo (nome_base)", grupo.length === 1 && grupo[0] === "Calça Operacional Unissex C/ Elástico AZUL", JSON.stringify(grupo));
+  const sem = (await rows<{ tamanho_rank: number }>("select tamanho_rank from stock_overview where codigo='301.7'"))[0];
+  ok("item sem tamanho vai para o fim (999)", sem.tamanho_rank === 999);
+
   console.log(`\n${passed} ok, ${failed} falhas`);
   process.exit(failed ? 1 : 0);
 }
