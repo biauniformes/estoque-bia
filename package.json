@@ -11,7 +11,8 @@
     "test:db": "tsx scripts/test-db.ts",
     "seed": "tsx scripts/seed.ts",
     "check": "npm run typecheck && npm run lint && npm run test:db",
-    "import:itens": "tsx scripts/import-itens.ts"
+    "import:itens": "tsx scripts/import-itens.ts",
+    "completar:tamanhos": "tsx scripts/completar-tamanhos.ts"
   },
   "dependencies": {
     "@radix-ui/react-dialog": "^1.1.23",
