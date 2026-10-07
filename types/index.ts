@@ -132,3 +132,11 @@ export type ActionResult<T = undefined> =
       detail?: Record<string, unknown>;
       fieldErrors?: Record<string, string>;
     };
+
+/** Linha da view stock_report: saldo + resumo do histórico de movimentações do item. */
+export type StockReportRow = StockRow & {
+  movimentos: number;
+  total_entradas: number;
+  total_saidas: number;
+  ultima_movimentacao: string | null;
+};

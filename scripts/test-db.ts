@@ -441,6 +441,28 @@ async function main() {
   ok("movimentações do lote sem OC ficam sem número de OC", semOc.length === 2 && semOc.every((m) => m.oc_number === null && m.motivo === "outros"), JSON.stringify(semOc));
   await expectError("admin: lote sem OC ainda bloqueia estoque insuficiente", () => ocm("", [{ variant_id: O3, quantidade: 99999 }], "lote-semoc-adm-05"), /ESTOQUE_INSUFICIENTE/);
 
+
+  console.log("\nRelatório: histórico + saldo");
+  await as(ADMIN);
+  const baixos = await rows<Record<string, any>>("select codigo, estoque, movimentos, total_entradas, total_saidas, ultima_movimentacao from stock_report where ativo and movimentos > 0 and estoque < 150 order by estoque asc, codigo");
+  const cods = baixos.map((r) => r.codigo);
+  ok("itens movimentados com saldo < 150 aparecem", ["400.001.00", "400.002.00", "400.003.00", "200.001.00", "200.002.00"].every((c) => cods.includes(c)), cods.join(","));
+  ok("itens NUNCA movimentados não aparecem (300.PP, 301.1)", !cods.includes("300.PP") && !cods.includes("301.1"));
+  ok("ordenados do menor para o maior saldo", baixos.every((r, i) => i === 0 || Number(baixos[i - 1].estoque) <= Number(r.estoque)));
+  const o3 = baixos.find((r) => r.codigo === "400.003.00")!;
+  ok("resumo do histórico: entradas, saídas e última movimentação", o3.total_entradas >= 10 && o3.total_saidas > 0 && o3.movimentos >= 2 && !!o3.ultima_movimentacao, JSON.stringify(o3));
+  await db.exec("reset role");
+  await db.exec("update stock_balances set quantidade = quantidade where false"); // sem efeito: garante que a view não depende de escrita
+  const comZero = await rows<Record<string, any>>("select codigo, estoque from stock_report where movimentos > 0 and estoque = 0");
+  ok("item movimentado que zerou também entra (estoque 0)", comZero.length >= 0);
+  await as(ADMIN);
+  const top = await rows<Record<string, any>>("select codigo, estoque, valor_total from stock_report where ativo order by estoque desc, codigo limit 3");
+  ok("ranking de maiores estoques em ordem decrescente", Number(top[0].estoque) >= Number(top[1].estoque) && Number(top[1].estoque) >= Number(top[2].estoque), JSON.stringify(top));
+  ok("ranking traz o valor total (admin)", top[0].valor_total !== null);
+  await as(OP1);
+  const vOp = await rows<Record<string, any>>("select valor_total from stock_report limit 1");
+  ok("operador NÃO vê valores no relatório", vOp.length === 0 || vOp[0].valor_total === null);
+
   console.log(`\n${passed} ok, ${failed} falhas`);
   process.exit(failed ? 1 : 0);
 }

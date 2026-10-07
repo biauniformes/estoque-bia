@@ -69,8 +69,9 @@ Execute **em ordem** no **SQL Editor** do Supabase (ou com `supabase db push` se
 6. `supabase/migrations/0006_ordem_tamanhos.sql` — ordena itens por modelo e tamanho (PP, P, M, G, GG, XG, G1…G5) a partir do nome
 7. `supabase/migrations/0007_saida_oc_lote.sql` — Saída por OC em lote (tudo ou nada) e OC obrigatória em toda saída de quem não é administrador
 8. `supabase/migrations/0008_saida_lote_oc_opcional_admin.sql` — no lote, a OC é opcional para administrador (com escolha do motivo)
+9. `supabase/migrations/0009_relatorio_historico.sql` — base dos relatórios de saldo (view `stock_report`: saldo + histórico de movimentações)
 
-`supabase/setup_completo.sql` reúne 0001–0008 num arquivo só (instalação nova, **sem** dados fictícios).
+`supabase/setup_completo.sql` reúne 0001–0009 num arquivo só (instalação nova, **sem** dados fictícios).
 `supabase/seed/01_catalog.sql` é um catálogo fictício **opcional**, só para demonstração.
 
 ## Importar o catálogo real (planilha) e remover os dados fictícios
@@ -90,7 +91,7 @@ Pode ser repetido: itens novos são criados e nome/valor dos existentes são atu
 
 ## Relatórios (Excel)
 
-Menu **Relatórios** (administrador): baixa **Estoque atual** (código, produto, quantidade, valor unitário, valor total com fórmulas, situação e linha de totais) e **Movimentações** por período. Cada exportação fica registrada na auditoria.
+Menu **Relatórios** (administrador): baixa **Estoque atual** (código, produto, quantidade, valor unitário, valor total com fórmulas, situação e linha de totais) e **Movimentações** por período. Também traz **Itens movimentados com saldo abaixo de N** (padrão 150, ajustável; só itens com ao menos uma movimentação no histórico) e **Peças com maior quantidade em estoque** (top 10/20/50/100), ambos com exportação em Excel. Cada exportação fica registrada na auditoria.
 
 ## Criação dos usuários e dados fictícios (opcional — só demonstração)
 

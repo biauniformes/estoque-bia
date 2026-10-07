@@ -3,7 +3,7 @@ import ExcelJS from "exceljs";
 import { createClient } from "@/lib/supabase/server";
 import { categoryLabel, REASON_LABELS, STATUS_LABELS } from "@/lib/constants";
 import { dayEndISO, dayStartISO, isDate, variantLabel } from "@/lib/utils";
-import type { MovementRow, StockRow } from "@/types";
+import type { MovementRow, StockReportRow, StockRow } from "@/types";
 
 const PAGE = 1000;
 const MAX_ROWS = 100_000;
@@ -148,4 +148,120 @@ export function newWorkbook() {
   wb.creator = "Estoque Bia";
   wb.created = new Date();
   return wb;
+}
+
+// ------------------------------------------------------------------ relatórios de saldo
+
+
+export const DEFAULT_LIMITE = 150;
+export const TOP_OPTIONS = [10, 20, 50, 100] as const;
+
+/** Itens JÁ MOVIMENTADOS (ao menos 1 movimentação no histórico) com saldo abaixo do limite, do menor para o maior. */
+export async function getLowMovedItems(limite: number) {
+  const supabase = await createClient();
+  return fetchAll<StockReportRow>((from, to) =>
+    supabase
+      .from("stock_report")
+      .select("*")
+      .eq("ativo", true)
+      .gt("movimentos", 0)
+      .lt("estoque", limite)
+      .order("estoque", { ascending: true })
+      .order("nome_base")
+      .order("tamanho_rank")
+      .range(from, to),
+  );
+}
+
+/** Itens com maior quantidade em estoque. */
+export async function getTopItems(top: number) {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("stock_report")
+    .select("*")
+    .eq("ativo", true)
+    .gt("estoque", 0)
+    .order("estoque", { ascending: false })
+    .order("produto")
+    .limit(top);
+  if (error) throw new Error(error.message);
+  return (data ?? []) as StockReportRow[];
+}
+
+function dateBR(iso: string | null) {
+  return iso ? new Date(new Date(iso).getTime() - 3 * 3_600_000) : null;
+}
+
+export function buildLowStockSheet(workbook: ExcelJS.Workbook, rows: StockReportRow[], limite: number) {
+  const sheet = workbook.addWorksheet(`Abaixo de ${limite}`.slice(0, 31));
+  sheet.columns = [
+    { header: "Código", key: "codigo", width: 14 },
+    { header: "Produto", key: "produto", width: 62 },
+    { header: "Cor / Tamanho", key: "variacao", width: 16 },
+    { header: "Estoque atual", key: "estoque", width: 14, style: { numFmt: INT_FORMAT } },
+    { header: "Total de entradas", key: "ent", width: 17, style: { numFmt: INT_FORMAT } },
+    { header: "Total de saídas", key: "sai", width: 16, style: { numFmt: INT_FORMAT } },
+    { header: "Movimentações", key: "mov", width: 15, style: { numFmt: INT_FORMAT } },
+    { header: "Última movimentação", key: "ult", width: 20, style: { numFmt: "dd/mm/yyyy hh:mm" } },
+    { header: "Valor unitário", key: "unit", width: 15, style: { numFmt: BRL_FORMAT } },
+    { header: "Valor em estoque", key: "total", width: 17, style: { numFmt: BRL_FORMAT } },
+    { header: "Situação", key: "status", width: 14 },
+  ];
+  styleHeader(sheet);
+  rows.forEach((r, i) => {
+    const line = i + 2;
+    sheet.addRow({
+      codigo: r.codigo,
+      produto: r.produto,
+      variacao: variantLabel(r.cor, r.tamanho),
+      estoque: r.estoque,
+      ent: r.total_entradas,
+      sai: r.total_saidas,
+      mov: r.movimentos,
+      ult: dateBR(r.ultima_movimentacao),
+      unit: Number(r.valor_unitario ?? 0),
+      total: { formula: `D${line}*I${line}`, result: Number(r.valor_total ?? 0) },
+      status: STATUS_LABELS[r.status],
+    });
+  });
+  const last = rows.length + 1;
+  const totals = sheet.addRow({
+    produto: `TOTAL (${rows.length} itens com saldo abaixo de ${limite})`,
+    estoque: { formula: `SUM(D2:D${last})`, result: rows.reduce((s, r) => s + r.estoque, 0) },
+    total: { formula: `SUM(J2:J${last})`, result: rows.reduce((s, r) => s + Number(r.valor_total ?? 0), 0) },
+  });
+  totals.font = { bold: true };
+  totals.eachCell((c) => (c.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFFFE5CC" } }));
+  sheet.autoFilter = { from: "A1", to: `K${Math.max(last, 2)}` };
+  return rows.length;
+}
+
+export function buildTopStockSheet(workbook: ExcelJS.Workbook, rows: StockReportRow[], totalPecas: number) {
+  const sheet = workbook.addWorksheet(`Maiores estoques`);
+  sheet.columns = [
+    { header: "#", key: "pos", width: 6 },
+    { header: "Código", key: "codigo", width: 14 },
+    { header: "Produto", key: "produto", width: 62 },
+    { header: "Cor / Tamanho", key: "variacao", width: 16 },
+    { header: "Estoque atual", key: "estoque", width: 14, style: { numFmt: INT_FORMAT } },
+    { header: "% do total de peças", key: "pct", width: 18, style: { numFmt: "0.0%" } },
+    { header: "Valor unitário", key: "unit", width: 15, style: { numFmt: BRL_FORMAT } },
+    { header: "Valor em estoque", key: "total", width: 17, style: { numFmt: BRL_FORMAT } },
+  ];
+  styleHeader(sheet);
+  rows.forEach((r, i) => {
+    const line = i + 2;
+    sheet.addRow({
+      pos: i + 1,
+      codigo: r.codigo,
+      produto: r.produto,
+      variacao: variantLabel(r.cor, r.tamanho),
+      estoque: r.estoque,
+      pct: totalPecas > 0 ? r.estoque / totalPecas : 0,
+      unit: Number(r.valor_unitario ?? 0),
+      total: { formula: `E${line}*G${line}`, result: Number(r.valor_total ?? 0) },
+    });
+  });
+  sheet.autoFilter = { from: "A1", to: `H${Math.max(rows.length + 1, 2)}` };
+  return rows.length;
 }

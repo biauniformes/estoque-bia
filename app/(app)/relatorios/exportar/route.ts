@@ -1,7 +1,17 @@
 import { getCurrentProfile } from "@/lib/auth/session";
 import { createClient } from "@/lib/supabase/server";
 import { getRequestMeta } from "@/lib/request-meta";
-import { buildMovementsSheet, buildStockSheet, getStockSnapshot, newWorkbook } from "@/services/reports";
+import {
+  buildLowStockSheet,
+  buildMovementsSheet,
+  buildStockSheet,
+  buildTopStockSheet,
+  DEFAULT_LIMITE,
+  getLowMovedItems,
+  getStockSnapshot,
+  getTopItems,
+  newWorkbook,
+} from "@/services/reports";
 import { isDate } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
@@ -17,7 +27,12 @@ export async function GET(request: Request) {
   if (profile.role !== "admin") return new Response("Acesso negado", { status: 403 });
 
   const url = new URL(request.url);
-  const tipo = url.searchParams.get("tipo") === "movimentacoes" ? "movimentacoes" : "estoque";
+  const tipoParam = url.searchParams.get("tipo");
+  const tipo = (["movimentacoes", "baixo", "maiores"] as const).find((t) => t === tipoParam) ?? "estoque";
+  const limiteRaw = parseInt(url.searchParams.get("limite") ?? "", 10);
+  const limite = Number.isFinite(limiteRaw) && limiteRaw > 0 ? Math.min(limiteRaw, 1_000_000) : DEFAULT_LIMITE;
+  const topRaw = parseInt(url.searchParams.get("top") ?? "", 10);
+  const top = Number.isFinite(topRaw) && topRaw > 0 ? Math.min(topRaw, 500) : 20;
   const fromParam = url.searchParams.get("from") ?? "";
   const toParam = url.searchParams.get("to") ?? "";
   const from = isDate(fromParam) ? fromParam : undefined;
@@ -30,6 +45,13 @@ export async function GET(request: Request) {
     if (tipo === "estoque") {
       linhas = buildStockSheet(wb, (await getStockSnapshot()).rows);
       nome = `estoque-bia-${todayBR()}.xlsx`;
+    } else if (tipo === "baixo") {
+      linhas = buildLowStockSheet(wb, await getLowMovedItems(limite), limite);
+      nome = `estoque-abaixo-de-${limite}-${todayBR()}.xlsx`;
+    } else if (tipo === "maiores") {
+      const [itens, snap] = await Promise.all([getTopItems(top), getStockSnapshot()]);
+      linhas = buildTopStockSheet(wb, itens, snap.pecas);
+      nome = `maiores-estoques-top${top}-${todayBR()}.xlsx`;
     } else {
       linhas = await buildMovementsSheet(wb, from, to);
       nome = `movimentacoes-bia-${from ?? "inicio"}_a_${to ?? todayBR()}.xlsx`;
@@ -44,7 +66,7 @@ export async function GET(request: Request) {
     p_action: "exportacao_relatorio",
     p_entity_type: "relatorio",
     p_entity_id: null,
-    p_metadata: { relatorio: tipo, linhas, de: from ?? null, ate: to ?? null, arquivo: nome },
+    p_metadata: { relatorio: tipo, linhas, de: from ?? null, ate: to ?? null, limite: tipo === "baixo" ? limite : null, top: tipo === "maiores" ? top : null, arquivo: nome },
     p_ip: ip,
     p_ua: ua,
   });
