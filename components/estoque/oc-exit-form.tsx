@@ -3,7 +3,7 @@
 import * as React from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { AlertTriangle, CheckCircle2, ClipboardPaste, Search, Trash2 } from "lucide-react";
+import { AlertTriangle, Check, CheckCircle2, ClipboardPaste, ListPlus, Search, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input, Textarea } from "@/components/ui/input";
@@ -54,7 +54,7 @@ export function OcExitForm({ variants, isAdmin }: { variants: StockRow[]; isAdmi
     setError(null);
   };
 
-  const matches = React.useMemo(() => {
+  const allMatches = React.useMemo(() => {
     const tokens = norm(search.trim()).split(/\s+/).filter(Boolean);
     if (tokens.length === 0) return [];
     return variants
@@ -62,8 +62,9 @@ export function OcExitForm({ variants, isAdmin }: { variants: StockRow[]; isAdmi
         const hay = norm(`${v.produto} ${v.codigo} ${v.sku}`);
         return tokens.every((t) => hay.includes(t));
       })
-      .slice(0, 8);
+      .slice(0, 300);
   }, [search, variants]);
+  const matches = allMatches.slice(0, 40);
 
   function focusQty(id: string) {
     setTimeout(() => {
@@ -72,11 +73,34 @@ export function OcExitForm({ variants, isAdmin }: { variants: StockRow[]; isAdmi
     }, 0);
   }
 
+  /** Enter na busca: adiciona e vai direto para a quantidade (fluxo de teclado). */
   function addItem(id: string) {
     touch();
     setLines((prev) => (prev.some((l) => l.id === id) ? prev : [...prev, { id, qty: "" }]));
     setSearch("");
     focusQty(id);
+  }
+
+  /** Clique na lista: marca/desmarca e mantém a busca aberta para escolher outras peças. */
+  function toggleItem(id: string) {
+    touch();
+    setLines((prev) => (prev.some((l) => l.id === id) ? prev.filter((l) => l.id !== id) : [...prev, { id, qty: "" }]));
+  }
+
+  function addAllMatches() {
+    touch();
+    setLines((prev) => {
+      const have = new Set(prev.map((l) => l.id));
+      const novos = allMatches.filter((v) => !have.has(v.variant_id)).slice(0, 100).map((v) => ({ id: v.variant_id, qty: "" }));
+      return [...prev, ...novos];
+    });
+  }
+
+  /** Terminou de escolher: fecha a lista e vai para a primeira quantidade em branco. */
+  function finishPicking() {
+    setSearch("");
+    const vazio = lines.find((l) => !(parseInt(l.qty || "0", 10) > 0));
+    if (vazio) focusQty(vazio.id);
   }
 
   function setQty(id: string, value: string) {
@@ -276,40 +300,68 @@ export function OcExitForm({ variants, isAdmin }: { variants: StockRow[]; isAdmi
                 addItem(matches[0].variant_id);
               }
             }}
-            placeholder="Buscar peça para adicionar (nome ou código) — Enter adiciona a primeira"
+            placeholder="Buscar peças (nome ou código) — clique para marcar várias, ou Enter para a primeira"
             aria-label="Buscar peça para adicionar"
             autoComplete="off"
             className="h-14 w-full rounded-2xl border-2 border-slate-300 bg-white pl-12 pr-4 text-lg placeholder:text-slate-400 focus-visible:border-brand focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-orange-200"
           />
         </div>
         {search.trim() && (
-          <ul className="mt-2 divide-y divide-slate-100 overflow-hidden rounded-2xl border-2 border-slate-200" role="listbox" aria-label="Peças encontradas">
-            {matches.length === 0 && <li className="px-4 py-4 text-slate-500">Nenhuma peça encontrada para “{search}”.</li>}
-            {matches.map((v) => {
-              const jaTem = lines.some((l) => l.id === v.variant_id);
-              return (
-                <li key={v.variant_id} role="option" aria-selected={false}>
-                  <button
-                    type="button"
-                    onClick={() => addItem(v.variant_id)}
-                    className="flex min-h-14 w-full items-center justify-between gap-3 px-4 py-2 text-left hover:bg-orange-50"
-                  >
-                    <span className="min-w-0">
-                      <span className="block font-bold">
-                        {v.produto}
-                        {variantLabel(v.cor, v.tamanho) && <span className="ml-2 font-normal text-slate-500">{variantLabel(v.cor, v.tamanho)}</span>}
+          <div className="mt-2 overflow-hidden rounded-2xl border-2 border-slate-200">
+            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 bg-slate-50 px-4 py-2">
+              <p className="text-sm text-slate-600">
+                <strong>{formatNumber(allMatches.length)}</strong> encontradas ·{" "}
+                <strong>{formatNumber(allMatches.filter((v) => lines.some((l) => l.id === v.variant_id)).length)}</strong> na lista
+                {allMatches.length > matches.length && <> · mostrando {matches.length} (refine a busca para ver as outras)</>}
+              </p>
+              <div className="flex gap-2">
+                {allMatches.length > 1 && (
+                  <Button type="button" size="sm" variant="outline" onClick={addAllMatches}>
+                    <ListPlus className="h-4 w-4" aria-hidden /> Adicionar todas ({formatNumber(Math.min(allMatches.length, 100))})
+                  </Button>
+                )}
+                <Button type="button" size="sm" onClick={finishPicking}>
+                  Concluir
+                </Button>
+              </div>
+            </div>
+            <ul className="max-h-96 divide-y divide-slate-100 overflow-y-auto" role="listbox" aria-multiselectable="true" aria-label="Peças encontradas">
+              {matches.length === 0 && <li className="px-4 py-4 text-slate-500">Nenhuma peça encontrada para “{search}”.</li>}
+              {matches.map((v) => {
+                const jaTem = lines.some((l) => l.id === v.variant_id);
+                return (
+                  <li key={v.variant_id} role="option" aria-selected={jaTem}>
+                    <button
+                      type="button"
+                      onClick={() => toggleItem(v.variant_id)}
+                      className={cn("flex min-h-14 w-full items-center gap-3 px-4 py-2 text-left hover:bg-orange-50", jaTem && "bg-orange-50")}
+                    >
+                      <span
+                        className={cn(
+                          "flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border-2",
+                          jaTem ? "border-brand bg-brand text-black" : "border-slate-300 bg-white text-transparent",
+                        )}
+                        aria-hidden
+                      >
+                        <Check className="h-5 w-5" />
                       </span>
-                      <span className="font-mono text-xs text-slate-500">{v.codigo}</span>
-                    </span>
-                    <span className="shrink-0 text-right text-sm">
-                      <span className={cn("font-bold tabular-nums", stockOf(v) === 0 ? "text-red-600" : "text-slate-700")}>{formatNumber(stockOf(v))} em estoque</span>
-                      {jaTem && <span className="block text-xs font-semibold text-orange-700">já na lista</span>}
-                    </span>
-                  </button>
-                </li>
-              );
-            })}
-          </ul>
+                      <span className="min-w-0 flex-1">
+                        <span className="block font-bold">
+                          {v.produto}
+                          {variantLabel(v.cor, v.tamanho) && <span className="ml-2 font-normal text-slate-500">{variantLabel(v.cor, v.tamanho)}</span>}
+                        </span>
+                        <span className="font-mono text-xs text-slate-500">{v.codigo}</span>
+                      </span>
+                      <span className="shrink-0 text-right text-sm">
+                        <span className={cn("font-bold tabular-nums", stockOf(v) === 0 ? "text-red-600" : "text-slate-700")}>{formatNumber(stockOf(v))} em estoque</span>
+                        {jaTem && <span className="block text-xs font-semibold text-orange-700">na lista</span>}
+                      </span>
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
         )}
 
         {rows.length === 0 ? (
