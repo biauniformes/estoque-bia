@@ -418,6 +418,29 @@ async function main() {
   const admSemOc = await mov(ADMIN, O1, "saida", 2, "perda", null, "key-semoc-0007");
   ok("administrador: saída sem OC (perda) continua permitida", admSemOc.oc_number === null && admSemOc.tipo === "saida");
 
+
+  console.log("\nSaída em lote: OC opcional só para administrador");
+  await db.exec("reset role");
+  await lote([{ variant_id: O2, quantidade: 20 }, { variant_id: O3, quantidade: 20 }], "lote-reposicao-01").catch(() => undefined);
+  const ocm = (oc: string, items: { variant_id: string; quantidade: number }[], key: string, motivo = "oc") =>
+    rows("select public.register_oc_exit($1,$2::jsonb,$3,null,'3.3.3.3','ua',$4) as r", [oc, JSON.stringify(items), key, motivo]).then((r) => (r[0] as { r: Record<string, any> }).r);
+  await as(OP1);
+  await expectError("operador: lote SEM OC continua bloqueado", () => ocm("", [{ variant_id: O3, quantidade: 1 }], "lote-semoc-op-01"), /OC_OBRIGATORIA/);
+  await expectError("operador: não escapa informando outro motivo sem OC", () => ocm("  ", [{ variant_id: O3, quantidade: 1 }], "lote-semoc-op-02", "perda"), /OC_OBRIGATORIA/);
+  await as(ADMIN);
+  const antes = await stock(O3);
+  const a1 = await ocm("", [{ variant_id: O3, quantidade: 2 }, { variant_id: O2, quantidade: 1 }], "lote-semoc-adm-01");
+  ok("admin: lote SEM OC funciona (motivo padrão 'outros')", a1.lancados === 2 && a1.oc === null && a1.motivo === "outros", JSON.stringify(a1));
+  const a2 = await ocm("", [{ variant_id: O3, quantidade: 1 }], "lote-semoc-adm-02", "perda");
+  ok("admin: lote sem OC com motivo 'perda'", a2.motivo === "perda" && (await stock(O3)) === antes - 3, JSON.stringify(a2));
+  const a3 = await ocm("", [{ variant_id: O3, quantidade: 1 }], "lote-semoc-adm-03", "oc");
+  ok("admin: motivo 'oc' sem número de OC vira 'outros' (nunca grava 'oc' sem número)", a3.motivo === "outros", JSON.stringify(a3));
+  const a4 = await ocm("OC 91", [{ variant_id: O3, quantidade: 1 }], "lote-comoc-adm-04");
+  ok("admin: lote COM OC continua normal (motivo 'oc', OC 91)", a4.oc === "91" && a4.motivo === "oc", JSON.stringify(a4));
+  const semOc = await rows<Record<string, any>>("select motivo, oc_number from stock_movements where idempotency_key like 'lote-semoc-adm-01:%'");
+  ok("movimentações do lote sem OC ficam sem número de OC", semOc.length === 2 && semOc.every((m) => m.oc_number === null && m.motivo === "outros"), JSON.stringify(semOc));
+  await expectError("admin: lote sem OC ainda bloqueia estoque insuficiente", () => ocm("", [{ variant_id: O3, quantidade: 99999 }], "lote-semoc-adm-05"), /ESTOQUE_INSUFICIENTE/);
+
   console.log(`\n${passed} ok, ${failed} falhas`);
   process.exit(failed ? 1 : 0);
 }

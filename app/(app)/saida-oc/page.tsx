@@ -12,7 +12,11 @@ export default async function SaidaOcPage() {
     <>
       <PageHeader
         title="Saída por OC"
-        description="Informe a OC uma vez, adicione todas as peças e quantidades e confirme de uma só vez."
+        description={
+          profile.role === "admin"
+            ? "Adicione todas as peças e quantidades e confirme de uma só vez. O número da OC é opcional para administradores."
+            : "Informe a OC uma vez, adicione todas as peças e quantidades e confirme de uma só vez."
+        }
       />
       <OcExitForm variants={variants} isAdmin={profile.role === "admin"} />
     </>

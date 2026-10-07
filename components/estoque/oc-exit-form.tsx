@@ -11,6 +11,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { registerOcExitAction, type OcExitResult } from "@/app/actions/movements";
 import { cn, formatNumber, newKey, normalizeOc, variantLabel } from "@/lib/utils";
+import { REASON_LABELS } from "@/lib/constants";
 import type { StockRow } from "@/types";
 
 type Line = { id: string; qty: string };
@@ -26,6 +27,7 @@ function parseLine(line: string): { code: string; qty: number } | null {
 export function OcExitForm({ variants, isAdmin }: { variants: StockRow[]; isAdmin: boolean }) {
   const router = useRouter();
   const [oc, setOc] = React.useState("");
+  const [motivo, setMotivo] = React.useState<"producao" | "perda" | "avaria" | "ajuste_negativo" | "outros">("outros");
   const [obs, setObs] = React.useState("");
   const [lines, setLines] = React.useState<Line[]>([]);
   const [search, setSearch] = React.useState("");
@@ -127,7 +129,7 @@ export function OcExitForm({ variants, isAdmin }: { variants: StockRow[]; isAdmi
   const semQtd = rows.filter((r) => r.n < 1).length;
   const faltando = rows.filter((r) => r.n > stockOf(r.v));
   const blocker =
-    !ocClean ? "Informe o número da OC" : rows.length === 0 ? "Adicione ao menos uma peça" : semQtd > 0 ? "Preencha a quantidade de todas as peças" : faltando.length > 0 ? "Há peças sem estoque suficiente" : null;
+    !ocClean && !isAdmin ? "Informe o número da OC" : rows.length === 0 ? "Adicione ao menos uma peça" : semQtd > 0 ? "Preencha a quantidade de todas as peças" : faltando.length > 0 ? "Há peças sem estoque suficiente" : null;
 
   async function submit() {
     if (lock.current || blocker) return;
@@ -138,6 +140,7 @@ export function OcExitForm({ variants, isAdmin }: { variants: StockRow[]; isAdmi
     try {
       const res = await registerOcExitAction({
         oc,
+        motivo,
         key: keyRef.current,
         observacao: obs,
         items: rows.map((r) => ({ variantId: r.id, quantidade: r.n })),
@@ -179,7 +182,7 @@ export function OcExitForm({ variants, isAdmin }: { variants: StockRow[]; isAdmi
       <Card className="mx-auto max-w-2xl p-8 text-center" role="status" aria-live="polite">
         <CheckCircle2 className="mx-auto h-20 w-20 text-emerald-600" aria-hidden />
         <h2 className="mt-4 text-3xl font-extrabold">Saída registrada!</h2>
-        <p className="mt-2 text-2xl font-bold">OC {result.oc}</p>
+        <p className="mt-2 text-2xl font-bold">{result.oc ? `OC ${result.oc}` : `Sem OC · ${REASON_LABELS[result.motivo] ?? result.motivo}`}</p>
         <p className="mt-4 text-6xl font-extrabold tabular-nums text-rose-600">
           −{formatNumber(result.pecas)}
           <span className="ml-2 text-2xl font-bold text-slate-500">peças</span>
@@ -194,7 +197,7 @@ export function OcExitForm({ variants, isAdmin }: { variants: StockRow[]; isAdmi
           <Button size="lg" variant="outline" onClick={reset}>
             Nova saída por OC
           </Button>
-          {isAdmin ? (
+          {isAdmin && result.oc ? (
             <Button size="lg" asChild>
               <Link href={`/ocs/${encodeURIComponent(result.oc)}`}>Ver a OC {result.oc}</Link>
             </Button>
@@ -213,7 +216,7 @@ export function OcExitForm({ variants, isAdmin }: { variants: StockRow[]; isAdmi
     <div className="mx-auto max-w-5xl space-y-6 pb-32">
       <Card className="p-5">
         <label htmlFor="oc" className="mb-1.5 block text-sm font-extrabold uppercase tracking-wide text-slate-700">
-          Número da OC <span className="text-red-600">*</span>
+          Número da OC {isAdmin ? <span className="font-semibold normal-case tracking-normal text-slate-500">(opcional para administrador)</span> : <span className="text-red-600">*</span>}
         </label>
         <div className="flex items-center gap-2">
           <span className="flex h-16 items-center rounded-2xl bg-slate-900 px-5 text-2xl font-extrabold text-white">OC</span>
@@ -233,7 +236,23 @@ export function OcExitForm({ variants, isAdmin }: { variants: StockRow[]; isAdmi
           />
         </div>
         {ocError && <p className="mt-1 text-sm font-medium text-red-600">{ocError}</p>}
-        <p className="mt-1 text-sm text-slate-500">Todas as peças abaixo saem para esta OC.</p>
+        {isAdmin && !ocClean ? (
+          <div className="mt-3">
+            <label htmlFor="motivo" className="mb-1.5 block text-sm font-bold text-slate-700">Motivo da saída (sem OC)</label>
+            <select
+              id="motivo"
+              value={motivo}
+              onChange={(e) => { touch(); setMotivo(e.target.value as typeof motivo); }}
+              className="h-12 w-full rounded-xl border-2 border-slate-300 bg-white px-4 text-base sm:w-72"
+            >
+              {(["outros", "producao", "perda", "avaria", "ajuste_negativo"] as const).map((m) => (
+                <option key={m} value={m}>{REASON_LABELS[m]}</option>
+              ))}
+            </select>
+          </div>
+        ) : (
+          <p className="mt-1 text-sm text-slate-500">Todas as peças abaixo saem para esta OC.</p>
+        )}
       </Card>
 
       <Card className="p-5">
@@ -384,7 +403,7 @@ export function OcExitForm({ variants, isAdmin }: { variants: StockRow[]; isAdmi
               </p>
             )}
             <p className="text-lg font-extrabold tabular-nums">
-              {ocClean ? `OC ${ocClean} · ` : ""}
+              {ocClean ? `OC ${ocClean} · ` : isAdmin ? "Sem OC · " : ""}
               {formatNumber(rows.length)} {rows.length === 1 ? "peça" : "peças diferentes"} · {formatNumber(pecas)} un.
             </p>
             {blocker && rows.length + oc.length > 0 && <p className="text-sm text-slate-500">{blocker}</p>}
@@ -398,7 +417,7 @@ export function OcExitForm({ variants, isAdmin }: { variants: StockRow[]; isAdmi
       <ConfirmDialog
         open={confirmOpen}
         onOpenChange={setConfirmOpen}
-        title={`Confirmar saída para a OC ${ocClean}?`}
+        title={ocClean ? `Confirmar saída para a OC ${ocClean}?` : `Confirmar saída sem OC (${REASON_LABELS[motivo]})?`}
         confirmLabel="CONFIRMAR SAÍDA"
         variant="saida"
         loading={pending}

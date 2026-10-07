@@ -145,7 +145,8 @@ export async function registerInitialCountAction(input: {
 }
 
 const ocExitSchema = z.object({
-  oc: z.string().trim().min(1, "Informe o número da OC.").max(30),
+  oc: z.string().trim().max(30).default(""),
+  motivo: z.enum(["producao", "perda", "avaria", "ajuste_negativo", "outros"]).default("outros"),
   key: z.string().min(8).max(100),
   observacao: z.string().trim().max(500, "Observação muito longa (máx. 500).").default(""),
   items: z
@@ -160,7 +161,8 @@ const ocExitSchema = z.object({
 });
 
 export type OcExitResult = {
-  oc: string;
+  oc: string | null;
+  motivo: string;
   lancados: number;
   repetidos: number;
   pecas: number;
@@ -169,12 +171,13 @@ export type OcExitResult = {
 
 /** Saída de várias peças para UMA OC, tudo ou nada (qualquer usuário ativo). */
 export async function registerOcExitAction(input: {
-  oc: string;
+  oc?: string;
+  motivo?: "producao" | "perda" | "avaria" | "ajuste_negativo" | "outros";
   key: string;
   observacao?: string;
   items: { variantId: string; quantidade: number }[];
 }): Promise<ActionResult<OcExitResult>> {
-  await requireUser();
+  const profile = await requireUser();
   const parsed = ocExitSchema.safeParse(input);
   if (!parsed.success) {
     const issue = parsed.error.issues[0];
@@ -182,7 +185,11 @@ export async function registerOcExitAction(input: {
   }
   const v = parsed.data;
   const oc = normalizeOc(v.oc);
-  if (!/^[A-Z0-9./-]{1,20}$/.test(oc)) {
+  // OC é obrigatória para quem não é administrador (o banco também exige); admin pode deixar em branco
+  if (!oc && profile.role !== "admin") {
+    return { ok: false, error: "Informe o número da OC.", code: "OC_OBRIGATORIA", fieldErrors: { oc: "Informe o número da OC." } };
+  }
+  if (oc && !/^[A-Z0-9./-]{1,20}$/.test(oc)) {
     return { ok: false, error: "Número de OC inválido (use letras, números, . / -).", code: "OC_INVALIDA", fieldErrors: { oc: "OC inválida." } };
   }
   if (new Set(v.items.map((i) => i.variantId)).size !== v.items.length) {
@@ -192,7 +199,8 @@ export async function registerOcExitAction(input: {
   const supabase = await createClient();
   const meta = await getRequestMeta();
   const { data, error } = await supabase.rpc("register_oc_exit", {
-    p_oc: oc,
+    p_oc: oc || null,
+    p_motivo: oc ? "oc" : v.motivo,
     p_items: v.items.map((i) => ({ variant_id: i.variantId, quantidade: i.quantidade })),
     p_batch_key: v.key,
     p_obs: v.observacao || null,
@@ -201,7 +209,7 @@ export async function registerOcExitAction(input: {
   });
   if (error) {
     const result = dbErrorToResult(error);
-    await logInvalid(supabase, meta, { lote_oc: oc, itens: v.items.length, erro: result.code ?? "ERRO", mensagem: result.error });
+    await logInvalid(supabase, meta, { lote_oc: oc || null, itens: v.items.length, erro: result.code ?? "ERRO", mensagem: result.error });
     return result;
   }
   refresh();
