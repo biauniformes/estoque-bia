@@ -88,6 +88,7 @@ export const AUDIT_ACTION_LABELS: Record<string, string> = {
   senha_redefinida: "Senha redefinida por administrador",
   exportacao_relatorio: "Relatório exportado",
   contagem_inicial: "Contagem inicial lançada",
+  saida_oc_lote: "Saída por OC (vários itens)",
   importacao_catalogo: "Catálogo importado",
   limpeza_dados_demonstracao: "Dados de demonstração removidos",
 };

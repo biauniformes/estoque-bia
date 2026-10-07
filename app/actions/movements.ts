@@ -6,6 +6,7 @@ import { getRequestMeta } from "@/lib/request-meta";
 import { dbErrorToResult } from "@/lib/errors";
 import { requireAdmin, requireUser } from "@/lib/auth/session";
 import { correctionSchema, movementSchema, type MovementInput } from "@/lib/validations/movement";
+import { normalizeOc } from "@/lib/utils";
 import { z } from "zod";
 import type { ActionResult, MovementResult } from "@/types";
 
@@ -29,7 +30,7 @@ async function logInvalid(supabase: Awaited<ReturnType<typeof createClient>>, me
 }
 
 export async function registerMovementAction(input: MovementInput): Promise<ActionResult<MovementResult>> {
-  await requireUser();
+  const profile = await requireUser();
   const parsed = movementSchema.safeParse(input);
   if (!parsed.success) {
     const fieldErrors: Record<string, string> = {};
@@ -37,6 +38,10 @@ export async function registerMovementAction(input: MovementInput): Promise<Acti
     return { ok: false, error: parsed.error.issues[0].message, code: "VALIDACAO", fieldErrors };
   }
   const v = parsed.data;
+  // quem não é administrador só registra saída com o número da OC (o banco também exige)
+  if (v.tipo === "saida" && profile.role !== "admin" && !normalizeOc(v.oc)) {
+    return { ok: false, error: "Informe o número da OC para registrar a saída.", code: "OC_OBRIGATORIA", fieldErrors: { oc: "Informe o número da OC." } };
+  }
   const supabase = await createClient();
   const meta = await getRequestMeta();
 
@@ -137,4 +142,68 @@ export async function registerInitialCountAction(input: {
   refresh();
   revalidatePath("/contagem");
   return { ok: true, data: data as CountResult };
+}
+
+const ocExitSchema = z.object({
+  oc: z.string().trim().min(1, "Informe o número da OC.").max(30),
+  key: z.string().min(8).max(100),
+  observacao: z.string().trim().max(500, "Observação muito longa (máx. 500).").default(""),
+  items: z
+    .array(
+      z.object({
+        variantId: z.string().uuid(),
+        quantidade: z.number().int().min(1, "A quantidade de cada peça deve ser maior que zero.").max(1_000_000, "Quantidade acima do limite."),
+      }),
+    )
+    .min(1, "Adicione ao menos uma peça.")
+    .max(500, "No máximo 500 itens por saída."),
+});
+
+export type OcExitResult = {
+  oc: string;
+  lancados: number;
+  repetidos: number;
+  pecas: number;
+  itens: { variant_id: string; estoque_posterior: number }[];
+};
+
+/** Saída de várias peças para UMA OC, tudo ou nada (qualquer usuário ativo). */
+export async function registerOcExitAction(input: {
+  oc: string;
+  key: string;
+  observacao?: string;
+  items: { variantId: string; quantidade: number }[];
+}): Promise<ActionResult<OcExitResult>> {
+  await requireUser();
+  const parsed = ocExitSchema.safeParse(input);
+  if (!parsed.success) {
+    const issue = parsed.error.issues[0];
+    return { ok: false, error: issue.message, code: "VALIDACAO", fieldErrors: issue.path[0] === "oc" ? { oc: issue.message } : undefined };
+  }
+  const v = parsed.data;
+  const oc = normalizeOc(v.oc);
+  if (!/^[A-Z0-9./-]{1,20}$/.test(oc)) {
+    return { ok: false, error: "Número de OC inválido (use letras, números, . / -).", code: "OC_INVALIDA", fieldErrors: { oc: "OC inválida." } };
+  }
+  if (new Set(v.items.map((i) => i.variantId)).size !== v.items.length) {
+    return { ok: false, error: "Há peças repetidas na lista.", code: "VALIDACAO" };
+  }
+
+  const supabase = await createClient();
+  const meta = await getRequestMeta();
+  const { data, error } = await supabase.rpc("register_oc_exit", {
+    p_oc: oc,
+    p_items: v.items.map((i) => ({ variant_id: i.variantId, quantidade: i.quantidade })),
+    p_batch_key: v.key,
+    p_obs: v.observacao || null,
+    p_ip: meta.ip,
+    p_ua: meta.ua,
+  });
+  if (error) {
+    const result = dbErrorToResult(error);
+    await logInvalid(supabase, meta, { lote_oc: oc, itens: v.items.length, erro: result.code ?? "ERRO", mensagem: result.error });
+    return result;
+  }
+  refresh();
+  return { ok: true, data: data as OcExitResult };
 }

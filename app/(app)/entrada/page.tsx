@@ -7,13 +7,13 @@ import { first } from "@/lib/utils";
 export const metadata = { title: "Entrada de estoque" };
 
 export default async function EntradaPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
-  await requireUser();
+  const profile = await requireUser();
   const sp = await searchParams;
   const variants = await listActiveVariants();
   return (
     <>
       <PageHeader title="Entrada de estoque" description="Registre a chegada de mercadoria em poucos toques." />
-      <MovementForm tipo="entrada" variants={variants} initialVariantId={first(sp.variant)} />
+      <MovementForm tipo="entrada" variants={variants} initialVariantId={first(sp.variant)} isAdmin={profile.role === "admin"} />
     </>
   );
 }

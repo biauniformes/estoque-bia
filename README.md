@@ -67,8 +67,9 @@ Execute **em ordem** no **SQL Editor** do Supabase (ou com `supabase db push` se
 4. `supabase/migrations/0004_valor_unitario.sql` — valor unitário por produto, valor total em estoque (visível só a administradores) e auditoria de exportações
 5. `supabase/migrations/0005_contagem_inicial.sql` — motivo "Contagem inicial" e lançamento em lote
 6. `supabase/migrations/0006_ordem_tamanhos.sql` — ordena itens por modelo e tamanho (PP, P, M, G, GG, XG, G1…G5) a partir do nome
+7. `supabase/migrations/0007_saida_oc_lote.sql` — Saída por OC em lote (tudo ou nada) e OC obrigatória em toda saída de quem não é administrador
 
-`supabase/setup_completo.sql` reúne 0001–0006 num arquivo só (instalação nova, **sem** dados fictícios).
+`supabase/setup_completo.sql` reúne 0001–0007 num arquivo só (instalação nova, **sem** dados fictícios).
 `supabase/seed/01_catalog.sql` é um catálogo fictício **opcional**, só para demonstração.
 
 ## Importar o catálogo real (planilha) e remover os dados fictícios
@@ -193,7 +194,9 @@ Mesmo chamando o Supabase direto com a chave anon, um operador não consegue nad
 | Recurso | Administrador | Operador de estoque |
 |---|:---:|:---:|
 | Ver estoque, detalhe do item | ✅ | ✅ |
-| Registrar entrada / saída (com OC) | ✅ | ✅ |
+| Registrar entrada / saída | ✅ | ✅ (toda saída exige o nº da OC) |
+| Saída por OC (várias peças de uma vez) | ✅ | ✅ |
+| Saída sem OC (perda, avaria, ajuste) | ✅ | ❌ |
 | Movimentações | todas | só as próprias |
 | Dashboard, Produtos, OCs | ✅ | ❌ |
 | Corrigir movimentação (ajuste) | ✅ | ❌ |

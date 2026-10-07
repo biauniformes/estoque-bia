@@ -15,7 +15,7 @@ import { ENTRADA_REASONS, SAIDA_REASONS, REASON_LABELS } from "@/lib/constants";
 import { cn, formatNumber, newKey, normalizeOc, variantLabel } from "@/lib/utils";
 import type { MovementResult, StockRow } from "@/types";
 
-type Props = { tipo: "entrada" | "saida"; variants: StockRow[]; initialVariantId?: string };
+type Props = { tipo: "entrada" | "saida"; variants: StockRow[]; initialVariantId?: string; isAdmin: boolean };
 
 const SUCCESS_REDIRECT_MS = 8000;
 
@@ -49,7 +49,7 @@ function Chip({ active, disabled, onClick, children }: { active: boolean; disabl
   );
 }
 
-export function MovementForm({ tipo, variants, initialVariantId }: Props) {
+export function MovementForm({ tipo, variants, initialVariantId, isAdmin }: Props) {
   const router = useRouter();
   const isSaida = tipo === "saida";
   const reasons = isSaida ? SAIDA_REASONS : ENTRADA_REASONS;
@@ -93,7 +93,8 @@ export function MovementForm({ tipo, variants, initialVariantId }: Props) {
   const current = variant ? stockOf(variant) : 0;
   const after = isSaida ? current - n : current + n;
   const insufficient = isSaida && !!variant && n > current;
-  const needsOc = isSaida && motivo === "oc";
+  // administrador: OC só quando o motivo é OC; demais usuários: TODA saída exige o número da OC
+  const needsOc = isSaida && (motivo === "oc" || !isAdmin);
   const ocClean = normalizeOc(oc);
   const missing = !variant ? (product && product.variants.length > 1 ? "Selecione produto, cor e tamanho" : "Selecione o produto") : n < 1 ? "Informe a quantidade" : needsOc && !ocClean ? "Informe o número da OC" : null;
   const canSubmit = !missing && !insufficient && !pending;
@@ -309,6 +310,7 @@ export function MovementForm({ tipo, variants, initialVariantId }: Props) {
                   />
                 </div>
                 {errors.oc && <p className="mt-1 text-sm font-medium text-red-600">{errors.oc}</p>}
+                {!isAdmin && <p className="mt-1 text-sm text-slate-500">Toda saída precisa do número da OC.</p>}
               </div>
             )}
             <div>
@@ -368,7 +370,7 @@ export function MovementForm({ tipo, variants, initialVariantId }: Props) {
               </>
             )}
             <dt className="text-slate-500">Quantidade</dt><dd className="font-extrabold tabular-nums text-rose-600">−{formatNumber(n)}</dd>
-            <dt className="text-slate-500">Destino</dt><dd className="font-bold">{needsOc ? `OC ${ocClean}` : REASON_LABELS[motivo]}</dd>
+            <dt className="text-slate-500">Destino</dt><dd className="font-bold">{needsOc ? `OC ${ocClean}${motivo !== "oc" ? ` · ${REASON_LABELS[motivo]}` : ""}` : REASON_LABELS[motivo]}</dd>
             <dt className="text-slate-500">Estoque atual</dt><dd className="font-bold tabular-nums">{formatNumber(current)}</dd>
             <dt className="text-slate-500">Após a saída</dt><dd className="font-extrabold tabular-nums">{formatNumber(after)}</dd>
           </dl>

@@ -354,6 +354,70 @@ async function main() {
   const sem = (await rows<{ tamanho_rank: number }>("select tamanho_rank from stock_overview where codigo='301.7'"))[0];
   ok("item sem tamanho vai para o fim (999)", sem.tamanho_rank === 999);
 
+
+  console.log("\nSaída por OC em lote");
+  await db.exec("reset role");
+  await db.exec("insert into products (codigo,nome,categoria,valor_unitario) values ('400.001.00','Item OC 1','outros',5), ('400.002.00','Item OC 2','outros',7), ('400.003.00','Item OC 3','outros',9)");
+  await db.exec("insert into product_variants (product_id,cor,tamanho,sku) select id,'Único','Único',codigo from products where codigo like '400.%'");
+  const O1 = await variantId("400.001.00");
+  const O2 = await variantId("400.002.00");
+  const O3 = await variantId("400.003.00");
+  await as(ADMIN);
+  await lote([{ variant_id: O1, quantidade: 50 }, { variant_id: O2, quantidade: 30 }, { variant_id: O3, quantidade: 10 }], "lote-oc-base-01");
+  const ocx = (oc: string, items: { variant_id: string; quantidade: number }[], key: string, obs: string | null = null) =>
+    rows("select public.register_oc_exit($1,$2::jsonb,$3,$4,'2.2.2.2','ua') as r", [oc, JSON.stringify(items), key, obs]).then((r) => (r[0] as { r: Record<string, any> }).r);
+
+  await as(OP1);
+  const s1 = await ocx("OC 77", [{ variant_id: O1, quantidade: 20 }, { variant_id: O2, quantidade: 5 }, { variant_id: O3, quantidade: 10 }], "oc-lote-0001-aa", "Pedido urgente");
+  ok("operador tira 3 itens de uma vez p/ OC 77 (35 peças)", s1.lancados === 3 && Number(s1.pecas) === 35 && s1.oc === "77", JSON.stringify(s1));
+  ok("saldos: 30, 25 e 0", (await stock(O1)) === 30 && (await stock(O2)) === 25 && (await stock(O3)) === 0);
+  const movs = await rows<Record<string, any>>("select motivo, oc_number, observacao, user_nome from stock_movements where oc_number='77'");
+  ok("3 movimentações motivo OC, número normalizado, com observação e usuário", movs.length === 3 && movs.every((m) => m.motivo === "oc" && m.observacao === "Pedido urgente" && m.user_nome === "Operador 1"), JSON.stringify(movs));
+
+  const s2 = await ocx("oc 77", [{ variant_id: O1, quantidade: 20 }, { variant_id: O2, quantidade: 5 }, { variant_id: O3, quantidade: 10 }], "oc-lote-0001-aa", "Pedido urgente");
+  ok("reenvio do mesmo lote não duplica (3 repetidos, saldos iguais)", s2.lancados === 0 && s2.repetidos === 3 && (await stock(O1)) === 30 && (await stock(O3)) === 0, JSON.stringify(s2));
+
+  let falhou: any = null;
+  try { await ocx("OC 78", [{ variant_id: O1, quantidade: 10 }, { variant_id: O2, quantidade: 26 }, { variant_id: O3, quantidade: 1 }], "oc-lote-0002-aa"); } catch (e) { falhou = e; }
+  ok("falta estoque em 2 itens: bloqueia o lote inteiro", !!falhou && /ESTOQUE_INSUFICIENTE/.test(falhou.message), falhou?.message);
+  const det = falhou?.detail ? JSON.parse(falhou.detail).itens : [];
+  ok("erro lista os itens: O2 faltam 1 e O3 faltam 1", det.length === 2 && det.every((d: any) => d.faltam === 1), JSON.stringify(det));
+  ok("nada foi lançado (O1 segue 30, O2 25)", (await stock(O1)) === 30 && (await stock(O2)) === 25);
+
+  const s3 = await ocx("OC 79", [{ variant_id: O1, quantidade: 4 }, { variant_id: O1, quantidade: 6 }], "oc-lote-0003-aa");
+  ok("mesma peça repetida no lote soma (10)", s3.lancados === 1 && Number(s3.pecas) === 10 && (await stock(O1)) === 20, JSON.stringify(s3));
+
+  await expectError("OC obrigatória", () => ocx("  ", [{ variant_id: O1, quantidade: 1 }], "oc-lote-0004-aa"), /OC_OBRIGATORIA/);
+  await expectError("OC inválida", () => ocx("77; drop", [{ variant_id: O1, quantidade: 1 }], "oc-lote-0005-aa"), /OC_INVALIDA/);
+  await expectError("lote vazio", () => ocx("OC 80", [], "oc-lote-0006-aa"), /LOTE_VAZIO/);
+  await expectError("quantidade 0", () => ocx("OC 80", [{ variant_id: O1, quantidade: 0 }], "oc-lote-0007-aa"), /QUANTIDADE_INVALIDA/);
+  await expectError("produto inexistente", () => ocx("OC 80", [{ variant_id: "11111111-1111-1111-1111-111111111111", quantidade: 1 }], "oc-lote-0008-aa"), /ESTOQUE_INSUFICIENTE|PRODUTO_INEXISTENTE/);
+  await as(null);
+  await expectError("sem sessão", () => ocx("OC 80", [{ variant_id: O1, quantidade: 1 }], "oc-lote-0009-aa"), /NAO_AUTENTICADO|permission denied/);
+
+  await as(ADMIN);
+  const resumo = (await rows<Record<string, any>>("select total_retirado, movimentos from oc_summary where oc_number='77'"))[0];
+  ok("OC 77 no resumo: 35 peças em 3 movimentos", resumo.total_retirado === 35 && resumo.movimentos === 3, JSON.stringify(resumo));
+  ok("auditoria do lote registrada", (await rows("select 1 from audit_logs where action='saida_oc_lote' and metadata->>'oc'='77'")).length === 1);
+
+
+  console.log("\nOC obrigatória para operadores (administrador fica livre)");
+  await as(OP2);
+  const estoqueAntes = await stock(O1);
+  await expectError("operador: saída 'perda' SEM OC é bloqueada", () => mov(OP2, O1, "saida", 1, "perda", null, "key-semoc-0001"), /OC_OBRIGATORIA/);
+  await expectError("operador: saída 'outros' com OC em branco é bloqueada", () => mov(OP2, O1, "saida", 1, "outros", "   ", "key-semoc-0002"), /OC_OBRIGATORIA/);
+  await expectError("operador: saída 'ajuste' SEM OC é bloqueada", () => mov(OP2, O1, "saida", 1, "ajuste_negativo", "", "key-semoc-0003"), /OC_OBRIGATORIA/);
+  ok("nada foi registrado nas tentativas sem OC", (await stock(O1)) === estoqueAntes);
+  const comOc = await mov(OP2, O1, "saida", 1, "oc", "OC 90", "key-semoc-0004");
+  ok("operador: saída COM OC funciona", comOc.oc_number === "90" && (await stock(O1)) === estoqueAntes - 1);
+  const perdaComOc = await mov(OP2, O1, "saida", 1, "perda", "90", "key-semoc-0005");
+  ok("operador: perda COM número de OC também é aceita e guarda a OC", perdaComOc.oc_number === "90");
+  const entradaSemOc = await mov(OP2, O1, "entrada", 3, "producao", null, "key-semoc-0006");
+  ok("operador: ENTRADA não exige OC", entradaSemOc.estoque_posterior === estoqueAntes - 2 + 3);
+  await as(ADMIN);
+  const admSemOc = await mov(ADMIN, O1, "saida", 2, "perda", null, "key-semoc-0007");
+  ok("administrador: saída sem OC (perda) continua permitida", admSemOc.oc_number === null && admSemOc.tipo === "saida");
+
   console.log(`\n${passed} ok, ${failed} falhas`);
   process.exit(failed ? 1 : 0);
 }

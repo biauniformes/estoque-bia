@@ -1,14 +1,15 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { ClipboardList, MinusCircle, Package, PlusCircle } from "lucide-react";
+import { ClipboardList, ListChecks, MinusCircle, Package, PlusCircle } from "lucide-react";
 import { requireUser } from "@/lib/auth/session";
 
 export const metadata = { title: "Início" };
 
 const ACTIONS = [
   { href: "/entrada", label: "+ ENTRADA", hint: "Chegou mercadoria", icon: PlusCircle, cls: "bg-brand hover:bg-orange-400 text-black" },
-  { href: "/saida", label: "− SAÍDA", hint: "Retirar para OC ou outro destino", icon: MinusCircle, cls: "bg-black hover:bg-neutral-700 text-white" },
-  { href: "/estoque", label: "VER ESTOQUE", hint: "Quanto eu tenho?", icon: Package, cls: "bg-white hover:bg-slate-100 text-black border-2 border-black" },
+  { href: "/saida-oc", label: "SAÍDA PARA OC", hint: "Vários itens de uma vez para a mesma OC", icon: ListChecks, cls: "bg-black hover:bg-neutral-700 text-white sm:col-span-2" },
+  { href: "/saida", label: "− SAÍDA", hint: "Uma peça por vez (informe a OC)", icon: MinusCircle, cls: "bg-white hover:bg-slate-100 text-black border-2 border-black" },
+  { href: "/estoque", label: "VER ESTOQUE", hint: "Quanto eu tenho?", icon: Package, cls: "bg-white hover:bg-slate-100 text-slate-900 border-2 border-slate-300" },
   { href: "/movimentacoes", label: "MOVIMENTAÇÕES", hint: "O que eu já registrei", icon: ClipboardList, cls: "bg-white hover:bg-slate-100 text-slate-900 border-2 border-slate-300" },
 ];
 
