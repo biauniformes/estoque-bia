@@ -54,8 +54,8 @@ export async function getStockSnapshot() {
 }
 
 /** Planilha "Estoque": uma linha por item, com valor unitário e total (fórmulas) e linha de totais. */
-export function buildStockSheet(workbook: ExcelJS.Workbook, rows: StockRow[]) {
-  const sheet = workbook.addWorksheet("Estoque");
+export function buildStockSheet(workbook: ExcelJS.Workbook, rows: StockRow[], sheetName = "Estoque") {
+  const sheet = workbook.addWorksheet(sheetName);
   sheet.columns = [
     { header: "Código", key: "codigo", width: 14 },
     { header: "Produto", key: "produto", width: 62 },
@@ -264,4 +264,20 @@ export function buildTopStockSheet(workbook: ExcelJS.Workbook, rows: StockReport
   });
   sheet.autoFilter = { from: "A1", to: `H${Math.max(rows.length + 1, 2)}` };
   return rows.length;
+}
+
+/**
+ * Saldo ATUAL dos itens que já foram movimentados pelo menos uma vez (qualquer quantidade).
+ * Por padrão só itens com saldo > 0; com `incluirZerados` entram também os que já zeraram.
+ */
+export async function getMovedStock(incluirZerados: boolean) {
+  const supabase = await createClient();
+  const rows = await fetchAll<StockReportRow>((from, to) => {
+    let q = supabase.from("stock_report").select("*").eq("ativo", true).gt("movimentos", 0);
+    if (!incluirZerados) q = q.gt("estoque", 0);
+    return q.order("nome_base").order("tamanho_rank").order("produto").range(from, to);
+  });
+  const pecas = rows.reduce((s, r) => s + r.estoque, 0);
+  const valor = rows.reduce((s, r) => s + Number(r.valor_total ?? 0), 0);
+  return { rows, pecas, valor };
 }

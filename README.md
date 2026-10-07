@@ -91,7 +91,7 @@ Pode ser repetido: itens novos são criados e nome/valor dos existentes são atu
 
 ## Relatórios (Excel)
 
-Menu **Relatórios** (administrador): baixa **Estoque atual** (código, produto, quantidade, valor unitário, valor total com fórmulas, situação e linha de totais) e **Movimentações** por período. Também traz **Itens movimentados com saldo abaixo de N** (padrão 150, ajustável; só itens com ao menos uma movimentação no histórico) e **Peças com maior quantidade em estoque** (top 10/20/50/100), ambos com exportação em Excel. Cada exportação fica registrada na auditoria.
+Menu **Relatórios** (administrador): baixa **Estoque atual** (código, produto, quantidade, valor unitário, valor total com fórmulas, situação e linha de totais) e **Movimentações** por período. Também traz **Estoque dos itens já movimentados** (saldo atual de quem já teve ao menos uma movimentação, com opção de incluir zerados), **Itens movimentados com saldo abaixo de N** (padrão 150, ajustável; só itens com ao menos uma movimentação no histórico) e **Peças com maior quantidade em estoque** (top 10/20/50/100), ambos com exportação em Excel. Cada exportação fica registrada na auditoria.
 
 ## Criação dos usuários e dados fictícios (opcional — só demonstração)
 

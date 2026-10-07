@@ -1,6 +1,6 @@
-import { AlertTriangle, Banknote, Download, FileSpreadsheet, Package, Trophy } from "lucide-react";
+import { AlertTriangle, Banknote, Boxes, Download, FileSpreadsheet, Package, Trophy } from "lucide-react";
 import { requireAdmin } from "@/lib/auth/session";
-import { DEFAULT_LIMITE, TOP_OPTIONS, getLowMovedItems, getStockSnapshot, getTopItems } from "@/services/reports";
+import { DEFAULT_LIMITE, TOP_OPTIONS, getLowMovedItems, getMovedStock, getStockSnapshot, getTopItems } from "@/services/reports";
 import { first, formatBRL, formatDateTime, formatNumber, variantLabel } from "@/lib/utils";
 import { PageHeader, StatCard } from "@/components/shared/page-header";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -23,10 +23,17 @@ export default async function RelatoriosPage({ searchParams }: { searchParams: P
   const topRaw = parseInt(first(sp.top), 10);
   const top = (TOP_OPTIONS as readonly number[]).includes(topRaw) ? topRaw : 20;
 
-  const [{ rows, pecas, valor }, baixos, maiores] = await Promise.all([getStockSnapshot(), getLowMovedItems(limite), getTopItems(top)]);
+  const zerados = first(sp.zerados) === "1";
+
+  const [{ rows, pecas, valor }, baixos, maiores, movidos] = await Promise.all([
+    getStockSnapshot(),
+    getLowMovedItems(limite),
+    getTopItems(top),
+    getMovedStock(zerados),
+  ]);
   const comEstoque = rows.filter((r) => r.estoque > 0).length;
   const topValor = [...rows].sort((a, b) => Number(b.valor_total ?? 0) - Number(a.valor_total ?? 0)).slice(0, 10).filter((r) => r.estoque > 0);
-  const zerados = baixos.filter((r) => r.estoque === 0).length;
+  const baixosZerados = baixos.filter((r) => r.estoque === 0).length;
 
   return (
     <>
@@ -37,6 +44,62 @@ export default async function RelatoriosPage({ searchParams }: { searchParams: P
         <StatCard label="Peças em estoque" value={formatNumber(pecas)} icon={<Package className="h-7 w-7" />} />
         <StatCard label="Valor total em estoque" value={formatBRL(valor)} tone="success" icon={<Banknote className="h-7 w-7" />} />
       </div>
+
+      {/* ------------------------------------------------ estoque dos itens movimentados */}
+      <Card className="mt-6 overflow-hidden">
+        <CardHeader className="gap-3">
+          <div className="flex flex-wrap items-start justify-between gap-4">
+            <div>
+              <CardTitle className="flex items-center gap-2">
+                <Boxes className="h-5 w-5 text-brand" aria-hidden /> Estoque dos itens já movimentados
+              </CardTitle>
+              <CardDescription>
+                Saldo atual de cada item que já teve ao menos uma movimentação, com muito ou pouco estoque. Mostra o que há no estoque, não as movimentações.
+              </CardDescription>
+            </div>
+            <Button asChild variant="dark">
+              <a href={`/relatorios/exportar?tipo=movimentados${zerados ? "&zerados=1" : ""}`} download>
+                <Download className="h-5 w-5" aria-hidden /> Baixar Excel
+              </a>
+            </Button>
+          </div>
+          <form method="get" className="flex flex-wrap items-center gap-4">
+            <input type="hidden" name="limite" value={limite} />
+            <input type="hidden" name="top" value={top} />
+            <label className="flex min-h-12 items-center gap-3 font-semibold text-slate-700">
+              <input type="checkbox" name="zerados" value="1" defaultChecked={zerados} className="h-6 w-6 accent-orange-600" />
+              Incluir itens que já zeraram
+            </label>
+            <Button type="submit" size="lg" variant="outline">Atualizar</Button>
+          </form>
+          <p className="text-sm font-semibold text-slate-700">
+            {formatNumber(movidos.rows.length)} {movidos.rows.length === 1 ? "item" : "itens"} · {formatNumber(movidos.pecas)} peças · {formatBRL(movidos.valor)}
+            {movidos.rows.length > MAX_ROWS_ON_SCREEN && <> · mostrando os {MAX_ROWS_ON_SCREEN} primeiros (o Excel traz todos)</>}
+          </p>
+        </CardHeader>
+        <DataTable<StockReportRow>
+          caption="Estoque dos itens já movimentados"
+          rows={movidos.rows.slice(0, MAX_ROWS_ON_SCREEN)}
+          rowKey={(r) => r.variant_id}
+          empty={<p className="px-5 pb-8 text-center text-slate-500">Nenhum item movimentado com estoque ainda.</p>}
+          columns={[
+            { header: "Código", hideBelow: "md", cell: (r) => <span className="font-mono text-sm">{r.codigo}</span> },
+            {
+              header: "Produto",
+              cell: (r) => (
+                <>
+                  <strong>{r.produto}</strong>
+                  {variantLabel(r.cor, r.tamanho) && <span className="ml-2 text-slate-500">{variantLabel(r.cor, r.tamanho)}</span>}
+                </>
+              ),
+            },
+            { header: "Estoque", align: "right", cell: (r) => <strong className="text-xl">{formatNumber(r.estoque)}</strong> },
+            { header: "Valor unit.", align: "right", hideBelow: "lg", cell: (r) => formatBRL(r.valor_unitario) },
+            { header: "Valor total", align: "right", hideBelow: "md", cell: (r) => <strong>{formatBRL(r.valor_total)}</strong> },
+            { header: "Situação", cell: (r) => <StockBadge status={r.status} /> },
+          ]}
+        />
+      </Card>
 
       {/* ------------------------------------------------ movimentados com saldo baixo */}
       <Card className="mt-6 overflow-hidden">
@@ -58,6 +121,7 @@ export default async function RelatoriosPage({ searchParams }: { searchParams: P
           </div>
           <form method="get" className="flex flex-wrap items-end gap-3">
             <input type="hidden" name="top" value={top} />
+            {zerados && <input type="hidden" name="zerados" value="1" />}
             <Field label="Mostrar itens com saldo abaixo de" htmlFor="limite">
               <Input id="limite" name="limite" type="number" min={1} inputMode="numeric" defaultValue={limite} className="w-40" />
             </Field>
@@ -65,7 +129,7 @@ export default async function RelatoriosPage({ searchParams }: { searchParams: P
           </form>
           <p className="text-sm font-semibold text-slate-700">
             {formatNumber(baixos.length)} {baixos.length === 1 ? "item" : "itens"}
-            {zerados > 0 && <> · {formatNumber(zerados)} zerados</>}
+            {baixosZerados > 0 && <> · {formatNumber(baixosZerados)} zerados</>}
             {baixos.length > MAX_ROWS_ON_SCREEN && <> · mostrando os {MAX_ROWS_ON_SCREEN} de menor saldo (o Excel traz todos)</>}
           </p>
         </CardHeader>
@@ -112,6 +176,7 @@ export default async function RelatoriosPage({ searchParams }: { searchParams: P
           </div>
           <form method="get" className="flex flex-wrap items-end gap-3">
             <input type="hidden" name="limite" value={limite} />
+            {zerados && <input type="hidden" name="zerados" value="1" />}
             <Field label="Mostrar os" htmlFor="top">
               <Select id="top" name="top" defaultValue={String(top)} className="w-40">
                 {TOP_OPTIONS.map((n) => (

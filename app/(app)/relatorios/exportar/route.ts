@@ -8,6 +8,7 @@ import {
   buildTopStockSheet,
   DEFAULT_LIMITE,
   getLowMovedItems,
+  getMovedStock,
   getStockSnapshot,
   getTopItems,
   newWorkbook,
@@ -28,7 +29,7 @@ export async function GET(request: Request) {
 
   const url = new URL(request.url);
   const tipoParam = url.searchParams.get("tipo");
-  const tipo = (["movimentacoes", "baixo", "maiores"] as const).find((t) => t === tipoParam) ?? "estoque";
+  const tipo = (["movimentacoes", "baixo", "maiores", "movimentados"] as const).find((t) => t === tipoParam) ?? "estoque";
   const limiteRaw = parseInt(url.searchParams.get("limite") ?? "", 10);
   const limite = Number.isFinite(limiteRaw) && limiteRaw > 0 ? Math.min(limiteRaw, 1_000_000) : DEFAULT_LIMITE;
   const topRaw = parseInt(url.searchParams.get("top") ?? "", 10);
@@ -45,6 +46,10 @@ export async function GET(request: Request) {
     if (tipo === "estoque") {
       linhas = buildStockSheet(wb, (await getStockSnapshot()).rows);
       nome = `estoque-bia-${todayBR()}.xlsx`;
+    } else if (tipo === "movimentados") {
+      const { rows } = await getMovedStock(url.searchParams.get("zerados") === "1");
+      linhas = buildStockSheet(wb, rows, "Itens movimentados");
+      nome = `estoque-itens-movimentados-${todayBR()}.xlsx`;
     } else if (tipo === "baixo") {
       linhas = buildLowStockSheet(wb, await getLowMovedItems(limite), limite);
       nome = `estoque-abaixo-de-${limite}-${todayBR()}.xlsx`;
@@ -66,7 +71,7 @@ export async function GET(request: Request) {
     p_action: "exportacao_relatorio",
     p_entity_type: "relatorio",
     p_entity_id: null,
-    p_metadata: { relatorio: tipo, linhas, de: from ?? null, ate: to ?? null, limite: tipo === "baixo" ? limite : null, top: tipo === "maiores" ? top : null, arquivo: nome },
+    p_metadata: { relatorio: tipo, linhas, de: from ?? null, ate: to ?? null, zerados: tipo === "movimentados" ? url.searchParams.get("zerados") === "1" : null, limite: tipo === "baixo" ? limite : null, top: tipo === "maiores" ? top : null, arquivo: nome },
     p_ip: ip,
     p_ua: ua,
   });
