@@ -1,7 +1,7 @@
 import "server-only";
 import { createClient } from "@/lib/supabase/server";
 import { PAGE_SIZE } from "@/lib/constants";
-import { safeLike } from "@/lib/utils";
+import { applyBusca } from "@/lib/utils";
 import type { StockRow } from "@/types";
 
 export type StockFilters = { q?: string; categoria?: string; cor?: string; tamanho?: string; status?: string; page?: number };
@@ -13,10 +13,7 @@ export async function listStock(f: StockFilters, pageSize = PAGE_SIZE) {
   const supabase = await createClient();
   const page = f.page ?? 1;
   let query = supabase.from("stock_overview").select("*", { count: "exact" }).eq("ativo", true);
-  if (f.q) {
-    const t = safeLike(f.q);
-    if (t) query = query.or(`produto.ilike.%${t}%,sku.ilike.%${t}%,codigo.ilike.%${t}%`);
-  }
+  if (f.q) query = applyBusca(query, f.q);
   if (f.categoria) query = query.eq("categoria", f.categoria);
   if (f.cor) query = query.eq("cor", f.cor);
   if (f.tamanho) query = query.eq("tamanho", f.tamanho);

@@ -21,6 +21,7 @@ export type StockRow = {
   tamanho_ordem: number;
   nome_base: string;
   tamanho_rank: number;
+  busca?: string;
   modelo: string | null;
   sku: string;
   barcode: string | null;

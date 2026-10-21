@@ -2,7 +2,7 @@ import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { requireAdmin } from "@/lib/auth/session";
 import { createClient } from "@/lib/supabase/server";
-import { first, formatBRL, formatNumber, safeLike } from "@/lib/utils";
+import { first, formatBRL, formatNumber, applyBusca } from "@/lib/utils";
 import { cn } from "@/lib/utils";
 import { PageHeader } from "@/components/shared/page-header";
 import { Card } from "@/components/ui/card";
@@ -31,10 +31,7 @@ export default async function ValoresPendentesPage({ searchParams }: { searchPar
   const [nAguardando, nRevisar] = await Promise.all([count("aguardando"), count("revisar")]);
 
   let query = supabase.from("products_admin").select("id,codigo,nome,valor_unitario,valor_pendente", { count: "exact" }).eq("valor_pendente", tipo);
-  if (q) {
-    const t = safeLike(q);
-    if (t) query = query.or(`nome.ilike.%${t}%,codigo.ilike.%${t}%`);
-  }
+  if (q) query = applyBusca(query, q);
   const from = (page - 1) * PAGE;
   const { data, count: total } = await query.order("codigo").range(from, from + PAGE - 1);
   const rows = (data ?? []) as Row[];

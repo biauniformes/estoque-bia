@@ -523,6 +523,25 @@ async function main() {
   const dash11 = (await rows<{ d: Record<string, any> }>("select public.dashboard_summary() as d"))[0].d;
   ok("dashboard continua calculando o valor total", Number(dash11.valor_total) > 0, JSON.stringify(dash11.valor_total));
 
+
+  console.log("\nBusca sem acento");
+  await as(OP1);
+  const bn = (await rows<{ b: string }>("select public.busca_norm('CALÇA ELÁSTICO Ñandú Ôntem') as b"))[0].b;
+  ok("busca_norm remove acentos e usa minúsculas", bn === "calca elastico nandu ontem", bn);
+  const porProd = await rows<{ busca: string }>("select busca from products where codigo = '300.PP'");
+  ok("products.busca = código + nome sem acento", porProd.length === 1 && porProd[0].busca === "300.pp calca operacional unissex c/ elastico azul pp", JSON.stringify(porProd));
+  const semAcento = await rows("select 1 from stock_overview where busca like '%calca%' and busca like '%elastico%'");
+  ok("operador acha 'calca elastico' (sem acento) em stock_overview", semAcento.length >= 11, String(semAcento.length));
+  const comAcento = await rows("select 1 from stock_overview where busca like '%calça%'");
+  ok("a coluna busca NÃO guarda acento (busca com acento não casa)", comAcento.length === 0);
+  await expectError("busca é coluna gerada (não pode ser escrita)", () => db.exec("update products set busca = 'x' where codigo='300.PP'"), /generated|permission denied|cannot|updated to DEFAULT/i);
+  await as(ADMIN);
+  const adm = await rows("select 1 from products_admin where busca like '%calca%'");
+  ok("admin também acha pela view products_admin", adm.length >= 11, String(adm.length));
+  await db.exec("update products set nome = 'Calça Ação Nova' where codigo = '300.PP'");
+  const atual = await rows<{ busca: string }>("select busca from products_admin where codigo = '300.PP'");
+  ok("renomear atualiza a busca sozinho", atual[0].busca === "300.pp calca acao nova", JSON.stringify(atual));
+
   console.log(`\n${passed} ok, ${failed} falhas`);
   process.exit(failed ? 1 : 0);
 }

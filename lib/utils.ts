@@ -95,3 +95,21 @@ export function variantLabel(cor: string, tamanho: string) {
   if (unico(cor) && unico(tamanho)) return "";
   return `${cor} / ${tamanho}`;
 }
+
+/** Mesma regra do banco (busca_norm): sem acento e em minúsculas. */
+export function buscaNorm(s: string) {
+  return s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+}
+
+/**
+ * Aplica a busca por PALAVRAS (todas precisam aparecer) na coluna `busca`, ignorando acentos.
+ * Ex.: "calca elastico azul" encontra "CALÇA ELÁSTICO COM CORDÃO … AZUL".
+ */
+export function applyBusca<Q extends { ilike: (column: string, pattern: string) => Q }>(query: Q, term: string, column = "busca"): Q {
+  let q = query;
+  for (const w of buscaNorm(term).split(/\s+/).filter(Boolean).slice(0, 8)) {
+    const safe = w.replace(/[\\%_]/g, (c) => `\\${c}`);
+    q = q.ilike(column, `%${safe}%`);
+  }
+  return q;
+}

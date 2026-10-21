@@ -3,7 +3,7 @@ import { Plus } from "lucide-react";
 import { requireAdmin } from "@/lib/auth/session";
 import { createClient } from "@/lib/supabase/server";
 import { CATEGORIES, PAGE_SIZE, categoryLabel } from "@/lib/constants";
-import { first, safeLike } from "@/lib/utils";
+import { first, applyBusca } from "@/lib/utils";
 import { PageHeader } from "@/components/shared/page-header";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -26,10 +26,7 @@ export default async function ProdutosPage({ searchParams }: { searchParams: Pro
   const supabase = await createClient();
 
   let query = supabase.from("products").select("id, codigo, nome, categoria, descricao, ativo, valor_pendente, created_at, updated_at, product_variants(id, ativo)", { count: "exact" });
-  if (params.q) {
-    const t = safeLike(params.q);
-    if (t) query = query.or(`nome.ilike.%${t}%,codigo.ilike.%${t}%`);
-  }
+  if (params.q) query = applyBusca(query, params.q);
   if (params.categoria) query = query.eq("categoria", params.categoria);
   if (params.status === "ativo") query = query.eq("ativo", true);
   if (params.status === "inativo") query = query.eq("ativo", false);
