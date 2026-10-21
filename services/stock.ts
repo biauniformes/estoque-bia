@@ -27,22 +27,31 @@ export async function listStock(f: StockFilters, pageSize = PAGE_SIZE) {
   return { rows: (data ?? []) as StockRow[], total: count ?? 0 };
 }
 
-/** Todas as variações ativas (usado pelos formulários de entrada/saída). */
+/**
+ * Todas as variações ativas (formulários de entrada/saída e contagem).
+ * O Supabase devolve no máximo 1000 linhas por requisição, então a leitura é paginada.
+ */
 export async function listActiveVariants() {
   const supabase = await createClient();
-  const { data, error } = await supabase
-    .from("stock_overview")
-    .select("*")
-    .eq("ativo", true)
-    .order("nome_base")
-    .order("tamanho_rank")
-    .order("produto")
-    .order("cor")
-    .order("tamanho_ordem")
-    .order("tamanho")
-    .limit(5000);
-  if (error) throw new Error(error.message);
-  return (data ?? []) as StockRow[];
+  const out: StockRow[] = [];
+  for (let from = 0; from < 20000; from += 1000) {
+    const { data, error } = await supabase
+      .from("stock_overview")
+      .select("*")
+      .eq("ativo", true)
+      .order("nome_base")
+      .order("tamanho_rank")
+      .order("produto")
+      .order("cor")
+      .order("tamanho_ordem")
+      .order("tamanho")
+      .order("variant_id") // desempate: mantém a paginação estável
+      .range(from, from + 999);
+    if (error) throw new Error(error.message);
+    out.push(...((data ?? []) as StockRow[]));
+    if (!data || data.length < 1000) break;
+  }
+  return out;
 }
 
 export async function getStockRow(variantId: string) {
@@ -53,7 +62,12 @@ export async function getStockRow(variantId: string) {
 
 export async function getStockFacets() {
   const supabase = await createClient();
-  const { data } = await supabase.from("product_variants").select("cor, tamanho").eq("ativo", true).limit(5000);
+  const data: { cor: string; tamanho: string }[] = [];
+  for (let from = 0; from < 20000; from += 1000) {
+    const r = await supabase.from("product_variants").select("cor, tamanho").eq("ativo", true).order("id").range(from, from + 999);
+    data.push(...((r.data ?? []) as { cor: string; tamanho: string }[]));
+    if (!r.data || r.data.length < 1000) break;
+  }
   const cores = [...new Set((data ?? []).map((v: { cor: string }) => v.cor))].sort((a, b) => a.localeCompare(b, "pt-BR"));
   const order = ["PP", "P", "M", "G", "GG", "XG", "EXG"];
   const tamanhos = [...new Set((data ?? []).map((v: { tamanho: string }) => v.tamanho))].sort((a, b) => {
