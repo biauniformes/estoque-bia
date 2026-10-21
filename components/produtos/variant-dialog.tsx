@@ -51,7 +51,7 @@ export function VariantDialog({ productId, variant }: { productId: string; varia
               <Field label="Tamanho" htmlFor="v-tam" error={e("tamanho")}><Input id="v-tam" name="tamanho" defaultValue={variant?.tamanho} required /></Field>
               <Field label="Modelo" htmlFor="v-mod"><Input id="v-mod" name="modelo" defaultValue={variant?.modelo ?? ""} /></Field>
               <Field label="Estoque mínimo" htmlFor="v-min" error={e("estoque_minimo")}>
-                <Input id="v-min" name="estoque_minimo" type="number" min={0} inputMode="numeric" defaultValue={variant?.estoque_minimo ?? 0} />
+                <Input id="v-min" name="estoque_minimo" type="number" min={0} inputMode="numeric" defaultValue={variant?.estoque_minimo ?? 50} />
               </Field>
               <Field label="SKU" htmlFor="v-sku" hint="Em branco: gerado automaticamente." className="sm:col-span-2">
                 <Input id="v-sku" name="sku" defaultValue={variant?.sku ?? ""} />

@@ -70,11 +70,12 @@ Execute **em ordem** no **SQL Editor** do Supabase (ou com `supabase db push` se
 7. `supabase/migrations/0007_saida_oc_lote.sql` — Saída por OC em lote (tudo ou nada) e OC obrigatória em toda saída de quem não é administrador
 8. `supabase/migrations/0008_saida_lote_oc_opcional_admin.sql` — no lote, a OC é opcional para administrador (com escolha do motivo)
 9. `supabase/migrations/0009_relatorio_historico.sql` — base dos relatórios de saldo (view `stock_report`: saldo + histórico de movimentações)
+13. `supabase/migrations/0013_estoque_baixo.sql` — "estoque baixo" = abaixo do mínimo; mínimo padrão 50 (rode também `supabase/manutencao/definir_estoque_minimo.sql`: 100 para camisetas PV e calças de brim azul/branca, 50 para o resto)
 12. `supabase/migrations/0012_busca_sem_acento.sql` — busca que ignora acentos e maiúsculas (coluna `products.busca`)
 11. `supabase/migrations/0011_valor_somente_admin.sql` — o valor unitário só é legível por administrador, no nível do banco (products_admin, product_price)
 10. `supabase/migrations/0010_valores_pendentes.sql` — itens "aguardando valor" / "revisar valor" (tela Produtos → Valores pendentes e alerta no dashboard) e limpeza segura de itens nunca movimentados
 
-`supabase/setup_completo.sql` reúne 0001–0012 num arquivo só (instalação nova, **sem** dados fictícios).
+`supabase/setup_completo.sql` reúne 0001–0013 num arquivo só (instalação nova, **sem** dados fictícios).
 `supabase/seed/01_catalog.sql` é um catálogo fictício **opcional**, só para demonstração.
 
 ## Importar o catálogo real (planilha) e remover os dados fictícios

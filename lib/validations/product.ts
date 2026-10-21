@@ -20,7 +20,7 @@ export const variantSchema = z.object({
   tamanho: z.string().trim().min(1, "Informe o tamanho.").max(20),
   modelo: z.string().trim().max(40).default(""),
   sku: z.string().trim().max(60).default(""),
-  estoque_minimo: z.coerce.number({ error: "Informe um número." }).int("Número inteiro.").min(0, "Não pode ser negativo.").max(1_000_000).default(0),
+  estoque_minimo: z.coerce.number({ error: "Informe um número." }).int("Número inteiro.").min(0, "Não pode ser negativo.").max(1_000_000).default(50),
 });
 
 /** SKU automático: CODIGO-COR3-TAMANHO (sem acentos). Item sem variação (Único): o próprio código. */

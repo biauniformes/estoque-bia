@@ -70,7 +70,7 @@ export function ProductForm({ product }: { product?: ProductRow }) {
             <Field label="Tamanho" htmlFor="tamanho" error={e("tamanho")}><Input id="tamanho" name="tamanho" placeholder="G" /></Field>
             <Field label="Modelo" htmlFor="modelo"><Input id="modelo" name="modelo" placeholder="Unissex" /></Field>
             <Field label="Estoque mínimo" htmlFor="estoque_minimo" error={e("estoque_minimo")}>
-              <Input id="estoque_minimo" name="estoque_minimo" type="number" min={0} defaultValue={0} inputMode="numeric" />
+              <Input id="estoque_minimo" name="estoque_minimo" type="number" min={0} defaultValue={50} inputMode="numeric" />
             </Field>
             <Field label="SKU" htmlFor="sku" hint="Em branco: usa o código do produto." className="sm:col-span-2">
               <Input id="sku" name="sku" placeholder="JAQ-001-AZU-G" />

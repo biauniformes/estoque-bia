@@ -542,6 +542,55 @@ async function main() {
   const atual = await rows<{ busca: string }>("select busca from products_admin where codigo = '300.PP'");
   ok("renomear atualiza a busca sozinho", atual[0].busca === "300.pp calca acao nova", JSON.stringify(atual));
 
+
+  console.log("\nEstoque baixo (mínimo 100 / 50)");
+  await db.exec("reset role");
+  await db.exec(`insert into products (codigo,nome,categoria,valor_unitario) values
+    ('700.001','CAMISETA BÁSICA MC MM PV ORBENK AZUL P','camisetas',10),
+    ('700.002','CAMISETA BÁSICA ML MM 100%ALG SEPAT BRANCA M','camisetas',10),
+    ('700.003','CALÇA ELÁSTICO COM CORDÃO BRIM ORBENK AZUL G','calcas',10),
+    ('700.004','CALÇA JEANS FEM TRADICIONAL ORBENK AZUL 40','calcas',10),
+    ('700.005','CALÇA ELÁSTICO COM CORDÃO BRIM 100% ALG SEPAT BRANCA PP','calcas',10),
+    ('700.006','BERMUDA BRIM AZUL M','bermudas',10),
+    ('700.007','CAMISETA BÁSICA ML MM PV PROFISER BRANCA GG','camisetas',10)`);
+  await db.exec("insert into product_variants (product_id,cor,tamanho,sku) select id,'Único','Único',codigo from products where codigo like '700.%'");
+  const mins0 = await rows<{ m: number }>("select distinct estoque_minimo as m from product_variants where sku like '700.%'");
+  ok("item novo nasce com mínimo 50 (padrão)", mins0.length === 1 && mins0[0].m === 50, JSON.stringify(mins0));
+
+  const auditAntes = (await rows<{ n: number }>("select count(*)::int n from audit_logs where action = 'variacao_alterado'"))[0].n;
+  await db.exec(readFileSync(join(root, "supabase", "manutencao", "definir_estoque_minimo.sql"), "utf8"));
+  const mins = Object.fromEntries((await rows<{ sku: string; m: number }>("select sku, estoque_minimo as m from product_variants where sku like '700.%'")).map((r) => [r.sku, r.m]));
+  ok("camiseta PV MC → 100; camiseta PV ML (PROFISER) → 100", mins["700.001"] === 100 && mins["700.007"] === 100, JSON.stringify(mins));
+  ok("calça BRIM azul e branca → 100", mins["700.003"] === 100 && mins["700.005"] === 100, JSON.stringify(mins));
+  ok("camiseta 100% ALG (sem PV), calça jeans e bermuda brim → 50", mins["700.002"] === 50 && mins["700.004"] === 50 && mins["700.006"] === 50, JSON.stringify(mins));
+  const auditDepois = (await rows<{ n: number }>("select count(*)::int n from audit_logs where action = 'variacao_alterado'"))[0].n;
+  ok("alteração em lote NÃO enche a auditoria (só 1 resumo)", auditDepois === auditAntes && (await rows("select 1 from audit_logs where action = 'estoque_minimo_definido'")).length === 1, `${auditAntes} → ${auditDepois}`);
+  await db.exec("update product_variants set estoque_minimo = 51 where sku = '700.006'");
+  ok("auditoria de variações volta a funcionar depois do script", (await rows<{ n: number }>("select count(*)::int n from audit_logs where action = 'variacao_alterado'"))[0].n === auditAntes + 1);
+  await db.exec("update product_variants set estoque_minimo = 50 where sku = '700.006'");
+
+  // regra: ABAIXO do mínimo = baixo; no mínimo exato = normal; zero = zerado
+  const V1 = await variantId("700.001"); // mínimo 100
+  const V2 = await variantId("700.002"); // mínimo 50
+  await as(ADMIN);
+  await mov(ADMIN, V1, "entrada", 99, "producao", null, "key-min-000001");
+  await mov(ADMIN, V2, "entrada", 50, "producao", null, "key-min-000002");
+  await as(OP1);
+  const st = (sku: string) => rows<{ status: string; estoque: number }>("select status, estoque from stock_overview where sku = $1", [sku]).then((r) => r[0]);
+  ok("99 un. com mínimo 100 → ESTOQUE BAIXO (visto pelo operador)", (await st("700.001")).status === "baixo");
+  ok("50 un. com mínimo 50 → Normal (só é baixo ABAIXO do mínimo)", (await st("700.002")).status === "normal");
+  ok("0 un. → Zerado", (await st("700.003")).status === "zerado");
+  await as(ADMIN);
+  await mov(ADMIN, V1, "entrada", 1, "producao", null, "key-min-000003");
+  await as(OP1);
+  ok("100 un. com mínimo 100 → Normal", (await st("700.001")).status === "normal");
+  await as(ADMIN);
+  await mov(ADMIN, V2, "saida", 1, "perda", null, "key-min-000004");
+  const dMin = (await rows<{ d: Record<string, any> }>("select public.dashboard_summary() as d"))[0].d;
+  const nomes = (dMin.atencao as { estoque: number; estoque_minimo: number }[]).map((a) => `${a.estoque}/${a.estoque_minimo}`);
+  ok("dashboard conta como baixo só item JÁ movimentado e abaixo do mínimo", dMin.estoque_baixo >= 1 && (dMin.atencao as any[]).every((a) => a.estoque < a.estoque_minimo), JSON.stringify({ n: dMin.estoque_baixo, nomes }));
+  ok("itens nunca movimentados (700.003…) não entram no alerta", !(dMin.atencao as any[]).some((a) => /BRIM ORBENK AZUL G/.test(a.produto)));
+
   console.log(`\n${passed} ok, ${failed} falhas`);
   process.exit(failed ? 1 : 0);
 }
