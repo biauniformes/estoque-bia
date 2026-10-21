@@ -20,6 +20,8 @@ type Summary = {
   saidas_hoje: number;
   estoque_baixo: number;
   ocs_movimentadas: number;
+  aguardando_valor: number;
+  revisar_valor: { id: string; codigo: string; nome: string; estoque: number }[];
   atencao: { variant_id: string; produto: string; cor: string; tamanho: string; estoque: number; estoque_minimo: number; status: StockStatus }[];
 };
 
@@ -42,6 +44,33 @@ export default async function DashboardPage() {
           </>
         }
       />
+
+      {((s.revisar_valor ?? []).length > 0 || (s.aguardando_valor ?? 0) > 0) && (
+        <div role="alert" className="mb-6 rounded-2xl border-2 border-amber-400 bg-amber-50 p-5 text-amber-900">
+          <p className="flex items-center gap-2 text-lg font-extrabold">
+            <AlertTriangle className="h-6 w-6 shrink-0" aria-hidden /> Valores para revisar
+          </p>
+          {(s.revisar_valor ?? []).length > 0 && (
+            <>
+              <p className="mt-1">Estes itens estão em uso com um valor <strong>provisório</strong>. É preciso rever o valor:</p>
+              <ul className="mt-2 space-y-1">
+                {(s.revisar_valor ?? []).map((r) => (
+                  <li key={r.id}>
+                    <Link href="/produtos/valores?tipo=revisar" className="font-semibold underline underline-offset-4">{r.codigo} — {r.nome}</Link>{" "}
+                    <span className="text-sm">({formatNumber(r.estoque)} un.)</span>
+                  </li>
+                ))}
+              </ul>
+            </>
+          )}
+          {(s.aguardando_valor ?? 0) > 0 && (
+            <p className="mt-2">
+              <Link href="/produtos/valores" className="font-bold underline underline-offset-4">{formatNumber(s.aguardando_valor)} itens novos aguardando valor</Link>{" "}
+              (desativados até você informar o preço).
+            </p>
+          )}
+        </div>
+      )}
 
       <div className="grid gap-4 md:grid-cols-2">
         <div className="flex items-center gap-5 rounded-2xl bg-black p-6 text-white shadow-sm">

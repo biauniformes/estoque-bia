@@ -6,7 +6,7 @@ import { createClient } from "@/lib/supabase/server";
 import { requireAdmin } from "@/lib/auth/session";
 import { dbErrorToResult } from "@/lib/errors";
 import { makeSku, productSchema, variantSchema } from "@/lib/validations/product";
-import { isUuid } from "@/lib/utils";
+import { isUuid, parseMoney } from "@/lib/utils";
 import type { ActionResult } from "@/types";
 
 export type FormState = ActionResult | null;
@@ -136,4 +136,21 @@ export async function setActiveAction(kind: "product" | "variant", id: string, a
   if (error) return dbErrorToResult(error);
   refresh();
   return { ok: true, data: undefined, message: ativo ? "Reativado." : "Desativado." };
+}
+
+/** Informa o valor de um item pendente. O banco limpa a marca e ativa o item ("aguardando"). */
+export async function setProductValueAction(id: string, valor: string): Promise<ActionResult> {
+  await requireAdmin();
+  if (!isUuid(id)) return { ok: false, error: "Item inválido." };
+  const n = parseMoney(valor);
+  if (!Number.isFinite(n) || n <= 0) return { ok: false, error: "Informe um valor maior que zero (ex.: 19,90).", code: "VALIDACAO" };
+  if (n > 1_000_000) return { ok: false, error: "Valor muito alto." };
+  const supabase = await createClient();
+  const { data, error } = await supabase.from("products").update({ valor_unitario: n }).eq("id", id).select("id, ativo");
+  if (error) return dbErrorToResult(error);
+  if (!data?.length) return { ok: false, error: "Item não encontrado." };
+  revalidatePath("/produtos/valores");
+  revalidatePath("/dashboard");
+  refresh();
+  return { ok: true, data: undefined, message: data[0].ativo ? "Valor salvo. Item ativo." : "Valor salvo." };
 }

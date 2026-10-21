@@ -35,6 +35,7 @@ export default async function ProdutosPage({ searchParams }: { searchParams: Pro
   if (params.status === "inativo") query = query.eq("ativo", false);
   const from = (page - 1) * PAGE_SIZE;
   const { data, count } = await query.order("nome").range(from, from + PAGE_SIZE - 1);
+  const { count: pendentes } = await supabase.from("products").select("id", { count: "exact", head: true }).not("valor_pendente", "is", null);
   const rows = (data ?? []) as Row[];
   const activeParams = Object.fromEntries(Object.entries(params).filter(([, v]) => v));
 
@@ -44,9 +45,14 @@ export default async function ProdutosPage({ searchParams }: { searchParams: Pro
         title="Produtos"
         description="Cadastro de produtos e variações (cor, tamanho, modelo, SKU e estoque mínimo)."
         actions={
-          <Button asChild size="lg">
-            <Link href="/produtos/novo"><Plus className="h-5 w-5" aria-hidden /> Novo produto</Link>
-          </Button>
+          <>
+            <Button asChild size="lg" variant="outline">
+              <Link href="/produtos/valores">Valores pendentes{pendentes ? ` (${pendentes})` : ""}</Link>
+            </Button>
+            <Button asChild size="lg">
+              <Link href="/produtos/novo"><Plus className="h-5 w-5" aria-hidden /> Novo produto</Link>
+            </Button>
+          </>
         }
       />
       <Card className="overflow-hidden">

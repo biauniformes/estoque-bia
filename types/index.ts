@@ -82,6 +82,7 @@ export type ProductRow = {
   categoria: string;
   descricao: string | null;
   valor_unitario: number;
+  valor_pendente: "aguardando" | "revisar" | null;
   ativo: boolean;
   created_at: string;
   updated_at: string;

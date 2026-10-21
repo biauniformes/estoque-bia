@@ -463,6 +463,34 @@ async function main() {
   const vOp = await rows<Record<string, any>>("select valor_total from stock_report limit 1");
   ok("operador NÃO vê valores no relatório", vOp.length === 0 || vOp[0].valor_total === null);
 
+
+  console.log("\nValores pendentes e limpeza segura");
+  await db.exec("reset role");
+  await db.exec("insert into products (codigo,nome,categoria,valor_unitario,ativo,valor_pendente) values ('500.001.00','Item novo sem preço','outros',0,false,'aguardando'), ('500.002.00','Item provisório','outros',1000,true,'revisar'), ('500.003.00','Item nunca usado','outros',5,true,null), ('500.004.00','Item usado','outros',5,true,null)");
+  await db.exec("insert into product_variants (product_id,cor,tamanho,sku) select id,'Único','Único',codigo from products where codigo like '500.%'");
+  const P4 = await variantId("500.004.00");
+  await as(ADMIN);
+  await mov(ADMIN, P4, "entrada", 3, "producao", null, "key-p4-000001");
+  const dpend = (await rows<{ d: Record<string, any> }>("select public.dashboard_summary() as d"))[0].d;
+  ok("dashboard conta itens aguardando valor", dpend.aguardando_valor === 1, JSON.stringify(dpend.aguardando_valor));
+  ok("dashboard lista itens para revisar valor", Array.isArray(dpend.revisar_valor) && dpend.revisar_valor.length === 1 && dpend.revisar_valor[0].codigo === "500.002.00", JSON.stringify(dpend.revisar_valor));
+  await db.exec("update products set valor_unitario = 22.5 where codigo = '500.001.00'");
+  const ativ = (await rows<Record<string, any>>("select ativo, valor_pendente, valor_unitario from products where codigo='500.001.00'"))[0];
+  ok("informar o valor ativa o item e limpa a marca 'aguardando'", ativ.ativo === true && ativ.valor_pendente === null && Number(ativ.valor_unitario) === 22.5, JSON.stringify(ativ));
+  await db.exec("update products set nome = 'Item provisório (renomeado)' where codigo = '500.002.00'");
+  ok("mudar só o nome NÃO limpa o alerta de revisão", (await rows("select 1 from products where codigo='500.002.00' and valor_pendente='revisar'")).length === 1);
+  await db.exec("update products set valor_unitario = 0 where codigo = '500.002.00'").catch(() => undefined);
+  await db.exec("update products set valor_unitario = 35 where codigo = '500.002.00'");
+  ok("informar novo valor limpa o alerta 'revisar' sem mexer no status", (await rows("select 1 from products where codigo='500.002.00' and valor_pendente is null and ativo")).length === 1);
+  await as(OP1);
+  await expectError("operador não executa a limpeza", () => rows("select public.purge_unused_products(array[]::uuid[])"), /permission denied/);
+  await db.exec("reset role");
+  const ids = (await rows<{ id: string }>("select id from products where codigo in ('500.003.00','500.004.00')")).map((r) => r.id);
+  const lim = (await rows<{ r: Record<string, any> }>("select public.purge_unused_products($1::uuid[]) as r", [ids]))[0].r;
+  ok("limpeza apaga só o item nunca movimentado (1 apagado, 1 ignorado)", lim.apagados === 1 && lim.ignorados === 1, JSON.stringify(lim));
+  ok("item com movimentação continua existindo; o outro sumiu", (await rows("select 1 from products where codigo='500.004.00'")).length === 1 && (await rows("select 1 from products where codigo='500.003.00'")).length === 0);
+  await expectError("saldo continua protegido depois da limpeza", () => db.exec("update stock_balances set quantidade = 99"), /SALDO_PROTEGIDO/);
+
   console.log(`\n${passed} ok, ${failed} falhas`);
   process.exit(failed ? 1 : 0);
 }
