@@ -1,4 +1,4 @@
-import { requireUser } from "@/lib/auth/session";
+import { requireNotExpedicao } from "@/lib/auth/session";
 import { listMovements, listUsersForFilter } from "@/services/movements";
 import { CATEGORIES, REASON_LABELS } from "@/lib/constants";
 import { first, formatDateTime, formatNumber, signed, variantLabel } from "@/lib/utils";
@@ -15,7 +15,7 @@ import type { MovementRow } from "@/types";
 export const metadata = { title: "Movimentações" };
 
 export default async function MovimentacoesPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
-  const profile = await requireUser();
+  const profile = await requireNotExpedicao();
   const isAdmin = profile.role === "admin";
   const sp = await searchParams;
   const params = {

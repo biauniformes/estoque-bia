@@ -31,6 +31,9 @@ async function logInvalid(supabase: Awaited<ReturnType<typeof createClient>>, me
 
 export async function registerMovementAction(input: MovementInput): Promise<ActionResult<MovementResult>> {
   const profile = await requireUser();
+  if (profile.role === "expedicao") {
+    return { ok: false, error: "O perfil Expedição só pode fazer saída por OC.", code: "SEM_PERMISSAO" };
+  }
   const parsed = movementSchema.safeParse(input);
   if (!parsed.success) {
     const fieldErrors: Record<string, string> = {};

@@ -44,6 +44,7 @@ export function CreateUserDialog() {
               <Field label="Função" htmlFor="u-role" error={e("role")}>
                 <Select id="u-role" name="role" defaultValue="operator">
                   <option value="operator">{ROLE_LABELS.operator}</option>
+                  <option value="expedicao">{ROLE_LABELS.expedicao}</option>
                   <option value="admin">{ROLE_LABELS.admin}</option>
                 </Select>
               </Field>
@@ -90,6 +91,7 @@ export function RoleSelect({ userId, role, disabled }: { userId: string; role: R
       className="h-11 min-w-48"
     >
       <option value="operator">{ROLE_LABELS.operator}</option>
+      <option value="expedicao">{ROLE_LABELS.expedicao}</option>
       <option value="admin">{ROLE_LABELS.admin}</option>
     </Select>
   );

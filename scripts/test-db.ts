@@ -591,6 +591,34 @@ async function main() {
   ok("dashboard conta como baixo só item JÁ movimentado e abaixo do mínimo", dMin.estoque_baixo >= 1 && (dMin.atencao as any[]).every((a) => a.estoque < a.estoque_minimo), JSON.stringify({ n: dMin.estoque_baixo, nomes }));
   ok("itens nunca movimentados (700.003…) não entram no alerta", !(dMin.atencao as any[]).some((a) => /BRIM ORBENK AZUL G/.test(a.produto)));
 
+
+  console.log("\nPerfil Expedição (só vê estoque e faz saída por OC)");
+  const EXP = "00000000-0000-0000-0000-0000000000e1";
+  await db.exec("reset role");
+  await db.exec(`insert into auth.users (id, email, raw_user_meta_data) values ('${EXP}', 'exp@t.dev', '{"nome":"Expedição"}')`);
+  await db.exec(`update profiles set role = 'expedicao' where id = '${EXP}'`);
+  const rolE = (await rows<{ role: string }>("select role::text as role from profiles where id = $1", [EXP]))[0].role;
+  ok("perfil 'expedicao' existe no banco", rolE === "expedicao", rolE);
+  await as(ADMIN);
+  const VEX = V1; // variação com estoque (camiseta PV, 100 un.)
+  await as(EXP);
+  await expectError("expedição NÃO registra entrada", () => mov(EXP, VEX, "entrada", 5, "producao", null, "key-exp-000001"), /SEM_PERMISSAO/);
+  await expectError("expedição NÃO faz saída avulsa (nem com OC)", () => mov(EXP, VEX, "saida", 1, "oc", "OC 5", "key-exp-000002"), /SEM_PERMISSAO/);
+  await expectError("expedição NÃO lança contagem inicial", () => lote([{ variant_id: VEX, quantidade: 5 }], "lote-exp-0001"), /SEM_PERMISSAO/);
+  await expectError("expedição NÃO corrige movimentação", () => rows("select public.correct_movement($1,1,'teste teste','key-exp-corr-01')", ["11111111-1111-1111-1111-111111111111"]), /SEM_PERMISSAO/);
+  const est0 = await stock(VEX);
+  await as(EXP);
+  const sx = await rows<{ r: Record<string, any> }>("select public.register_oc_exit('OC 321', $1::jsonb, 'oc-exp-lote-01', null, null, null, 'oc') as r", [JSON.stringify([{ variant_id: VEX, quantidade: 2 }])]);
+  ok("expedição FAZ saída por OC", sx[0].r.lancados === 1 && (await stock(VEX)) === est0 - 2, JSON.stringify(sx[0].r));
+  await as(EXP);
+  await expectError("expedição NÃO faz saída por OC sem o número da OC", () => rows("select public.register_oc_exit('', $1::jsonb, 'oc-exp-lote-02', null, null, null, 'oc')", [JSON.stringify([{ variant_id: VEX, quantidade: 1 }])]), /OC_OBRIGATORIA/);
+  await expectError("expedição NÃO escapa da OC escolhendo motivo 'perda'", () => rows("select public.register_oc_exit('', $1::jsonb, 'oc-exp-lote-03', null, null, null, 'perda')", [JSON.stringify([{ variant_id: VEX, quantidade: 1 }])]), /OC_OBRIGATORIA/);
+  const vis = await rows<Record<string, any>>("select estoque, valor_unitario, valor_total, status from stock_overview where variant_id = $1", [VEX]);
+  ok("expedição VÊ o estoque, sem valores", vis.length === 1 && vis[0].valor_unitario === null && vis[0].valor_total === null && vis[0].estoque === est0 - 2, JSON.stringify(vis));
+  await expectError("expedição NÃO lê o valor na tabela de produtos", () => rows("select valor_unitario from products"), /permission denied/);
+  await expectError("expedição NÃO acessa o dashboard de admin", () => rows("select public.dashboard_summary()"), /SEM_PERMISSAO/);
+  await expectError("expedição NÃO lê a auditoria", () => rows("select * from audit_logs").then((r) => { if (r.length) throw new Error("vazou"); throw new Error("permission denied (0 linhas)"); }), /permission denied/);
+
   console.log(`\n${passed} ok, ${failed} falhas`);
   process.exit(failed ? 1 : 0);
 }

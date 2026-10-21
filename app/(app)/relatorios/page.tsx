@@ -1,5 +1,5 @@
 import { AlertTriangle, Banknote, Boxes, Building2, Download, FileSpreadsheet, Package, Trophy } from "lucide-react";
-import { requireUser } from "@/lib/auth/session";
+import { requireNotExpedicao } from "@/lib/auth/session";
 import { DEFAULT_LIMITE, EMPRESAS, SEM_EMPRESA, TOP_OPTIONS, combinaEmpresa, empresaLabel, getLowMovedItems, getMovedStock, getStockSnapshot, getTopItems, parseEmpresa, resumoPorEmpresa } from "@/services/reports";
 import { RelatorioOperador } from "./operador-view";
 import { first, formatBRL, formatDateTime, formatNumber, variantLabel } from "@/lib/utils";
@@ -16,7 +16,7 @@ export const metadata = { title: "Relatórios" };
 const MAX_ROWS_ON_SCREEN = 100;
 
 export default async function RelatoriosPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
-  const profile = await requireUser();
+  const profile = await requireNotExpedicao();
   const sp = await searchParams;
   // operador: só código, nome e quantidade (sem valores)
   if (profile.role !== "admin") return <RelatorioOperador sp={sp} />;

@@ -21,6 +21,13 @@ export async function requireUser(): Promise<Profile> {
   return profile;
 }
 
+/** Perfil Expedição só vê o estoque e faz saída por OC: as demais telas voltam para o início. */
+export async function requireNotExpedicao(): Promise<Profile> {
+  const profile = await requireUser();
+  if (profile.role === "expedicao") redirect("/");
+  return profile;
+}
+
 /** Garante administrador no SERVIDOR. Tentativas de operadores ficam registradas na auditoria. */
 export async function requireAdmin(): Promise<Profile> {
   const profile = await requireUser();

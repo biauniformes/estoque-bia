@@ -22,6 +22,7 @@ export default async function HomePage() {
 
   // itens com quantidade ABAIXO do mínimo (100 nas camisetas PV e calças de brim azul/branca; 50 nos demais)
   const supabase = await createClient();
+  const acoes = profile.role === "expedicao" ? ACTIONS.filter((a) => ["/saida-oc", "/estoque"].includes(a.href)) : ACTIONS;
   const { count: baixos } = await supabase.from("stock_overview").select("variant_id", { count: "exact", head: true }).eq("ativo", true).eq("status", "baixo");
 
   return (
@@ -41,7 +42,7 @@ export default async function HomePage() {
         </Link>
       )}
       <div className="grid gap-4 sm:grid-cols-2">
-        {ACTIONS.map((a) => (
+        {acoes.map((a) => (
           <Link
             key={a.href}
             href={a.href}

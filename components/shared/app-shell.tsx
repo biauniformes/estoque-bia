@@ -58,7 +58,11 @@ function Brand() {
 
 function NavList({ role, onNavigate }: { role: Role; onNavigate?: () => void }) {
   const pathname = usePathname();
-  const items = NAV.filter((i) => !i.admin || role === "admin").filter((i) => !(role === "admin" && i.href === "/"));
+  // Expedição: só Início, Estoque e Saída por OC
+  const EXPEDICAO = ["/", "/estoque", "/saida-oc"];
+  const items = NAV.filter((i) => !i.admin || role === "admin")
+    .filter((i) => !(role === "admin" && i.href === "/"))
+    .filter((i) => role !== "expedicao" || EXPEDICAO.includes(i.href));
   return (
     <nav aria-label="Menu principal" className="flex flex-col gap-1.5">
       {items.map((item) => {

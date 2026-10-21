@@ -20,6 +20,7 @@ export const metadata = { title: "Estoque atual" };
 export default async function EstoquePage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const profile = await requireUser();
   const isAdmin = profile.role === "admin";
+  const isExpedicao = profile.role === "expedicao"; // só consulta: sem link de detalhe e sem botões de entrada/saída
   const sp = await searchParams;
   const params = {
     q: first(sp.q),
@@ -58,12 +59,21 @@ export default async function EstoquePage({ searchParams }: { searchParams: Prom
     { header: "Código", hideBelow: "md", cell: (r) => <span className="font-mono text-sm">{r.codigo}</span> },
     {
       header: "Produto",
-      cell: (r) => (
-        <Link href={`/estoque/${r.variant_id}`} className="font-bold text-slate-900 underline-offset-4 hover:text-orange-700 hover:underline">
-          {r.produto}
-          {variantLabel(r.cor, r.tamanho) && <span className="block text-sm font-normal text-slate-500">{variantLabel(r.cor, r.tamanho)}</span>}
-        </Link>
-      ),
+      cell: (r) => {
+        const nome = (
+          <>
+            {r.produto}
+            {variantLabel(r.cor, r.tamanho) && <span className="block text-sm font-normal text-slate-500">{variantLabel(r.cor, r.tamanho)}</span>}
+          </>
+        );
+        return isExpedicao ? (
+          <span className="font-bold text-slate-900">{nome}</span>
+        ) : (
+          <Link href={`/estoque/${r.variant_id}`} className="font-bold text-slate-900 underline-offset-4 hover:text-orange-700 hover:underline">
+            {nome}
+          </Link>
+        );
+      },
     },
     { header: "Estoque", align: "right", cell: (r) => <strong className="text-xl">{formatNumber(r.estoque)}</strong> },
     { header: "Mínimo", align: "right", hideBelow: "lg", cell: (r) => formatNumber(r.estoque_minimo) },
@@ -74,6 +84,7 @@ export default async function EstoquePage({ searchParams }: { searchParams: Prom
         ] as Column<StockRow>[])
       : []),
     { header: "Status", cell: (r) => <StockBadge status={r.status} /> },
+    ...(isExpedicao ? [] : ([
     {
       header: "Ação",
       align: "right",
@@ -92,6 +103,7 @@ export default async function EstoquePage({ searchParams }: { searchParams: Prom
         </div>
       ),
     },
+    ] as Column<StockRow>[])),
   ];
 
   return (

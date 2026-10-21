@@ -1,13 +1,13 @@
 import { MovementForm } from "@/components/estoque/movement-form";
 import { PageHeader } from "@/components/shared/page-header";
-import { requireUser } from "@/lib/auth/session";
+import { requireNotExpedicao } from "@/lib/auth/session";
 import { listActiveVariants } from "@/services/stock";
 import { first } from "@/lib/utils";
 
 export const metadata = { title: "Entrada de estoque" };
 
 export default async function EntradaPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
-  const profile = await requireUser();
+  const profile = await requireNotExpedicao();
   const sp = await searchParams;
   const variants = await listActiveVariants();
   return (
