@@ -47,7 +47,7 @@ export async function getStockSnapshot(marca: Marca | "" = "") {
   const rows = await fetchAll<StockRow>((from, to) => {
     let q = supabase.from("stock_overview").select("*").eq("ativo", true);
     if (marca) q = q.ilike("produto", `%${marca}%`);
-    return q.order("nome_base").order("tamanho_rank").order("produto").order("cor").order("tamanho_ordem").range(from, to);
+    return q.order("nome_base").order("tamanho_rank").order("produto").order("cor").order("tamanho_ordem").order("variant_id").range(from, to);
   });
   const pecas = rows.reduce((s, r) => s + r.estoque, 0);
   const valor = rows.reduce((s, r) => s + Number(r.valor_total ?? 0), 0);
@@ -105,7 +105,7 @@ export async function buildMovementsSheet(workbook: ExcelJS.Workbook, from?: str
     if (marca) q = q.ilike("produto", `%${marca}%`);
     if (from && isDate(from)) q = q.gte("created_at", dayStartISO(from));
     if (to && isDate(to)) q = q.lte("created_at", dayEndISO(to));
-    return q.order("created_at", { ascending: false }).range(a, b);
+    return q.order("created_at", { ascending: false }).order("id").range(a, b);
   });
 
   const sheet = workbook.addWorksheet("Movimentações");
@@ -164,7 +164,7 @@ export async function getLowMovedItems(limite: number, marca: Marca | "" = "") {
   return fetchAll<StockReportRow>((from, to) => {
     let q = supabase.from("stock_report").select("*").eq("ativo", true).gt("movimentos", 0).lt("estoque", limite);
     if (marca) q = q.ilike("produto", `%${marca}%`);
-    return q.order("estoque", { ascending: true }).order("nome_base").order("tamanho_rank").range(from, to);
+    return q.order("estoque", { ascending: true }).order("nome_base").order("tamanho_rank").order("variant_id").range(from, to);
   });
 }
 
@@ -173,7 +173,7 @@ export async function getTopItems(top: number, marca: Marca | "" = "") {
   const supabase = await createClient();
   let q = supabase.from("stock_report").select("*").eq("ativo", true).gt("estoque", 0);
   if (marca) q = q.ilike("produto", `%${marca}%`);
-  const { data, error } = await q.order("estoque", { ascending: false }).order("produto").limit(top);
+  const { data, error } = await q.order("estoque", { ascending: false }).order("produto").order("variant_id").limit(top);
   if (error) throw new Error(error.message);
   return (data ?? []) as StockReportRow[];
 }
@@ -266,7 +266,7 @@ export async function getMovedStock(incluirZerados: boolean, marca: Marca | "" =
     let q = supabase.from("stock_report").select("*").eq("ativo", true).gt("movimentos", 0);
     if (marca) q = q.ilike("produto", `%${marca}%`);
     if (!incluirZerados) q = q.gt("estoque", 0);
-    return q.order("nome_base").order("tamanho_rank").order("produto").range(from, to);
+    return q.order("nome_base").order("tamanho_rank").order("produto").order("variant_id").range(from, to);
   });
   const pecas = rows.reduce((s, r) => s + r.estoque, 0);
   const valor = rows.reduce((s, r) => s + Number(r.valor_total ?? 0), 0);

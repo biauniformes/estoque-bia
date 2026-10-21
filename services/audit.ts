@@ -26,7 +26,7 @@ export async function listAuditEvents(f: AuditFilters, pageSize = PAGE_SIZE) {
   if (f.to && isDate(f.to)) query = query.lte("created_at", dayEndISO(f.to));
 
   const from = (page - 1) * pageSize;
-  const { data, count, error } = await query.order("created_at", { ascending: false }).range(from, from + pageSize - 1);
+  const { data, count, error } = await query.order("created_at", { ascending: false }).order("id").range(from, from + pageSize - 1);
   if (error) throw new Error(error.message);
   return { rows: (data ?? []) as AuditRow[], total: count ?? 0 };
 }

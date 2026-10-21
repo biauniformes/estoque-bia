@@ -27,7 +27,7 @@ export default async function OcsPage({ searchParams }: { searchParams: Promise<
     if (t) query = query.ilike("oc_number", `%${t}%`);
   }
   const from = (page - 1) * PAGE_SIZE;
-  const { data, count } = await query.order("ultima_movimentacao", { ascending: false }).range(from, from + PAGE_SIZE - 1);
+  const { data, count } = await query.order("ultima_movimentacao", { ascending: false }).order("oc_number").range(from, from + PAGE_SIZE - 1);
   const rows = (data ?? []) as OcSummaryRow[];
 
   return (

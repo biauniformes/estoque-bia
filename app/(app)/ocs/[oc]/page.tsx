@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 import { requireAdmin } from "@/lib/auth/session";
-import { listMovements } from "@/services/movements";
+import { listAllMovements } from "@/services/movements";
 import { REASON_LABELS } from "@/lib/constants";
 import { formatDateTime, formatNumber, normalizeOc, signed, variantLabel } from "@/lib/utils";
 import { PageHeader } from "@/components/shared/page-header";
@@ -25,7 +25,7 @@ export default async function OcDetailPage({ params }: { params: Promise<{ oc: s
   const oc = normalizeOc(decoded);
   if (!/^[A-Z0-9./-]{1,20}$/.test(oc)) notFound();
 
-  const { rows } = await listMovements({ oc }, 500);
+  const rows = await listAllMovements({ oc });
   if (rows.length === 0) notFound();
 
   // total líquido por item (saídas − devoluções/correções vinculadas à OC)

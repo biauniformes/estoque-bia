@@ -36,7 +36,7 @@ export async function listMovements(f: MovementFilters, pageSize = PAGE_SIZE) {
   if (f.to && isDate(f.to)) query = query.lte("created_at", dayEndISO(f.to));
 
   const from = (page - 1) * pageSize;
-  const { data, count, error } = await query.order("created_at", { ascending: false }).range(from, from + pageSize - 1);
+  const { data, count, error } = await query.order("created_at", { ascending: false }).order("id").range(from, from + pageSize - 1);
   if (error) throw new Error(error.message);
   return { rows: (data ?? []) as MovementRow[], total: count ?? 0 };
 }
@@ -45,4 +45,15 @@ export async function listUsersForFilter() {
   const supabase = await createClient();
   const { data } = await supabase.from("profiles").select("id, nome").order("nome");
   return (data ?? []) as { id: string; nome: string }[];
+}
+
+/** Lê TODAS as páginas de um filtro (usado onde o total precisa ser exato, ex.: itens de uma OC). */
+export async function listAllMovements(f: MovementFilters, maxPages = 100) {
+  const all: MovementRow[] = [];
+  for (let page = 1; page <= maxPages; page++) {
+    const { rows, total } = await listMovements({ ...f, page }, 1000);
+    all.push(...rows);
+    if (all.length >= total || rows.length === 0) break;
+  }
+  return all;
 }

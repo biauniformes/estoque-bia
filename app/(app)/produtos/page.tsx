@@ -34,7 +34,7 @@ export default async function ProdutosPage({ searchParams }: { searchParams: Pro
   if (params.status === "ativo") query = query.eq("ativo", true);
   if (params.status === "inativo") query = query.eq("ativo", false);
   const from = (page - 1) * PAGE_SIZE;
-  const { data, count } = await query.order("nome").range(from, from + PAGE_SIZE - 1);
+  const { data, count } = await query.order("nome").order("id").range(from, from + PAGE_SIZE - 1);
   const { count: pendentes } = await supabase.from("products").select("id", { count: "exact", head: true }).not("valor_pendente", "is", null);
   const rows = (data ?? []) as Row[];
   const activeParams = Object.fromEntries(Object.entries(params).filter(([, v]) => v));

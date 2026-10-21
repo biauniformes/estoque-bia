@@ -6,7 +6,8 @@ import type { StockRow } from "@/types";
 
 export type StockFilters = { q?: string; categoria?: string; cor?: string; tamanho?: string; status?: string; page?: number };
 
-const ORDER = ["nome_base", "tamanho_rank", "produto", "cor", "tamanho_ordem", "tamanho"] as const;
+// "variant_id" no fim desempata: sem ele, linhas iguais podem repetir ou sumir entre páginas
+const ORDER = ["nome_base", "tamanho_rank", "produto", "cor", "tamanho_ordem", "tamanho", "variant_id"] as const;
 
 export async function listStock(f: StockFilters, pageSize = PAGE_SIZE) {
   const supabase = await createClient();
