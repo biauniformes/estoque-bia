@@ -2,37 +2,53 @@ import { getCurrentProfile } from "@/lib/auth/session";
 import { createClient } from "@/lib/supabase/server";
 import { getRequestMeta } from "@/lib/request-meta";
 import {
+  buildEmpresasWorkbook,
   buildLowStockSheet,
   buildMovementsSheet,
   buildStockSheet,
   buildTopStockSheet,
   DEFAULT_LIMITE,
+  empresaLabel,
   getLowMovedItems,
   getMovedStock,
   getStockSnapshot,
   getTopItems,
   newWorkbook,
-  parseMarca,
+  parseEmpresa,
 } from "@/services/reports";
 import { isDate } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
 
+const TIPOS = ["estoque", "empresas", "maiores", "movimentados", "baixo", "movimentacoes"] as const;
+type Tipo = (typeof TIPOS)[number];
+/** Relatórios que o OPERADOR pode gerar (sempre sem valores). */
+const TIPOS_OPERADOR: Tipo[] = ["estoque", "empresas", "maiores"];
+
 function todayBR() {
   return new Intl.DateTimeFormat("sv-SE", { timeZone: "America/Sao_Paulo" }).format(new Date()); // AAAA-MM-DD
 }
 
-// Exportação em Excel. Somente administradores (os valores em R$ são sensíveis).
+/**
+ * Exportação em Excel.
+ *  - Administrador: todos os relatórios; escolhe a versão ("completo" com valores ou "operador" sem valores).
+ *  - Operador: só estoque / empresas / maiores, SEMPRE sem valores (código, nome e quantidade).
+ */
 export async function GET(request: Request) {
   const profile = await getCurrentProfile();
   if (!profile || !profile.ativo) return new Response("Não autenticado", { status: 401 });
-  if (profile.role !== "admin") return new Response("Acesso negado", { status: 403 });
+  const isAdmin = profile.role === "admin";
 
   const url = new URL(request.url);
-  const tipoParam = url.searchParams.get("tipo");
-  const tipo = (["movimentacoes", "baixo", "maiores", "movimentados"] as const).find((t) => t === tipoParam) ?? "estoque";
-  const marca = parseMarca(url.searchParams.get("marca"));
-  const sufixo = marca ? `-${marca.toLowerCase()}` : "";
+  const tipoParam = url.searchParams.get("tipo") ?? "";
+  const tipo: Tipo = (TIPOS as readonly string[]).includes(tipoParam) ? (tipoParam as Tipo) : "estoque";
+  if (!isAdmin && !TIPOS_OPERADOR.includes(tipo)) return new Response("Acesso negado", { status: 403 });
+
+  // operador NUNCA recebe valores, mesmo que force o parâmetro na URL
+  const valores = isAdmin && url.searchParams.get("versao") !== "operador";
+  const empresa = parseEmpresa(url.searchParams.get("empresa") ?? url.searchParams.get("marca"));
+  const soEstoque = url.searchParams.get("soestoque") === "1";
+  const zerados = url.searchParams.get("zerados") === "1";
   const limiteRaw = parseInt(url.searchParams.get("limite") ?? "", 10);
   const limite = Number.isFinite(limiteRaw) && limiteRaw > 0 ? Math.min(limiteRaw, 1_000_000) : DEFAULT_LIMITE;
   const topRaw = parseInt(url.searchParams.get("top") ?? "", 10);
@@ -42,26 +58,30 @@ export async function GET(request: Request) {
   const from = isDate(fromParam) ? fromParam : undefined;
   const to = isDate(toParam) ? toParam : undefined;
 
+  const sufixo = `${empresa ? `-${empresa.toLowerCase()}` : ""}${valores ? "" : "-sem-valores"}`;
   const wb = newWorkbook();
   let linhas: number;
   let nome: string;
   try {
     if (tipo === "estoque") {
-      linhas = buildStockSheet(wb, (await getStockSnapshot(marca)).rows, marca ? `Estoque ${marca}` : "Estoque");
+      linhas = buildStockSheet(wb, (await getStockSnapshot(empresa, soEstoque)).rows, empresa ? `Estoque ${empresaLabel(empresa)}` : "Estoque", valores);
       nome = `estoque-bia${sufixo}-${todayBR()}.xlsx`;
+    } else if (tipo === "empresas") {
+      linhas = buildEmpresasWorkbook(wb, (await getStockSnapshot("", true)).rows, valores);
+      nome = `estoque-por-empresa${sufixo}-${todayBR()}.xlsx`;
+    } else if (tipo === "maiores") {
+      const [itens, snap] = await Promise.all([getTopItems(top, empresa), getStockSnapshot(empresa, true)]);
+      linhas = buildTopStockSheet(wb, itens, snap.pecas, valores);
+      nome = `maiores-estoques-top${top}${sufixo}-${todayBR()}.xlsx`;
     } else if (tipo === "movimentados") {
-      const { rows } = await getMovedStock(url.searchParams.get("zerados") === "1", marca);
-      linhas = buildStockSheet(wb, rows, "Itens movimentados");
+      const { rows } = await getMovedStock(zerados, empresa);
+      linhas = buildStockSheet(wb, rows, "Itens movimentados", valores);
       nome = `estoque-itens-movimentados${sufixo}-${todayBR()}.xlsx`;
     } else if (tipo === "baixo") {
-      linhas = buildLowStockSheet(wb, await getLowMovedItems(limite, marca), limite);
+      linhas = buildLowStockSheet(wb, await getLowMovedItems(limite, empresa), limite, valores);
       nome = `estoque-abaixo-de-${limite}${sufixo}-${todayBR()}.xlsx`;
-    } else if (tipo === "maiores") {
-      const [itens, snap] = await Promise.all([getTopItems(top, marca), getStockSnapshot(marca)]);
-      linhas = buildTopStockSheet(wb, itens, snap.pecas);
-      nome = `maiores-estoques-top${top}${sufixo}-${todayBR()}.xlsx`;
     } else {
-      linhas = await buildMovementsSheet(wb, from, to, marca);
+      linhas = await buildMovementsSheet(wb, from, to, empresa);
       nome = `movimentacoes-bia${sufixo}-${from ?? "inicio"}_a_${to ?? todayBR()}.xlsx`;
     }
   } catch {
@@ -74,7 +94,18 @@ export async function GET(request: Request) {
     p_action: "exportacao_relatorio",
     p_entity_type: "relatorio",
     p_entity_id: null,
-    p_metadata: { relatorio: tipo, linhas, de: from ?? null, ate: to ?? null, marca: marca || null, zerados: tipo === "movimentados" ? url.searchParams.get("zerados") === "1" : null, limite: tipo === "baixo" ? limite : null, top: tipo === "maiores" ? top : null, arquivo: nome },
+    p_metadata: {
+      relatorio: tipo,
+      empresa: empresa || null,
+      versao: valores ? "completo" : "operador",
+      linhas,
+      de: from ?? null,
+      ate: to ?? null,
+      zerados: tipo === "movimentados" ? zerados : null,
+      limite: tipo === "baixo" ? limite : null,
+      top: tipo === "maiores" ? top : null,
+      arquivo: nome,
+    },
     p_ip: ip,
     p_ua: ua,
   });

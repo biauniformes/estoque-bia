@@ -1,6 +1,7 @@
-import { AlertTriangle, Banknote, Boxes, Download, FileSpreadsheet, Package, Trophy } from "lucide-react";
-import { requireAdmin } from "@/lib/auth/session";
-import { DEFAULT_LIMITE, MARCAS, TOP_OPTIONS, getLowMovedItems, getMovedStock, getStockSnapshot, getTopItems, parseMarca } from "@/services/reports";
+import { AlertTriangle, Banknote, Boxes, Building2, Download, FileSpreadsheet, Package, Trophy } from "lucide-react";
+import { requireUser } from "@/lib/auth/session";
+import { DEFAULT_LIMITE, EMPRESAS, SEM_EMPRESA, TOP_OPTIONS, combinaEmpresa, empresaLabel, getLowMovedItems, getMovedStock, getStockSnapshot, getTopItems, parseEmpresa, resumoPorEmpresa } from "@/services/reports";
+import { RelatorioOperador } from "./operador-view";
 import { first, formatBRL, formatDateTime, formatNumber, variantLabel } from "@/lib/utils";
 import { PageHeader, StatCard } from "@/components/shared/page-header";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -15,8 +16,14 @@ export const metadata = { title: "Relatórios" };
 const MAX_ROWS_ON_SCREEN = 100;
 
 export default async function RelatoriosPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
-  await requireAdmin();
+  const profile = await requireUser();
   const sp = await searchParams;
+  // operador: só código, nome e quantidade (sem valores)
+  if (profile.role !== "admin") return <RelatorioOperador sp={sp} />;
+  return <RelatoriosAdmin sp={sp} />;
+}
+
+async function RelatoriosAdmin({ sp }: { sp: Record<string, string | string[] | undefined> }) {
 
   const limiteRaw = parseInt(first(sp.limite), 10);
   const limite = Number.isFinite(limiteRaw) && limiteRaw > 0 ? Math.min(limiteRaw, 1_000_000) : DEFAULT_LIMITE;
@@ -24,15 +31,21 @@ export default async function RelatoriosPage({ searchParams }: { searchParams: P
   const top = (TOP_OPTIONS as readonly number[]).includes(topRaw) ? topRaw : 20;
 
   const zerados = first(sp.zerados) === "1";
-  const marca = parseMarca(first(sp.marca));
-  const mq = marca ? `&marca=${marca}` : "";
+  const marca = parseEmpresa(first(sp.empresa));
+  // "completo" = com valores; "operador" = só código, nome e quantidade (vale para os arquivos Excel)
+  const versao = first(sp.versao) === "operador" ? "operador" : "completo";
+  const mq = `${marca ? `&empresa=${marca}` : ""}${versao === "operador" ? "&versao=operador" : ""}`;
 
-  const [{ rows, pecas, valor }, baixos, maiores, movidos] = await Promise.all([
-    getStockSnapshot(marca),
+  const [todas, baixos, maiores, movidos] = await Promise.all([
+    getStockSnapshot(""),
     getLowMovedItems(limite, marca),
     getTopItems(top, marca),
     getMovedStock(zerados, marca),
   ]);
+  const rows = marca ? todas.rows.filter((r) => combinaEmpresa(r.produto, marca)) : todas.rows;
+  const pecas = rows.reduce((a, r) => a + r.estoque, 0);
+  const valor = rows.reduce((a, r) => a + Number(r.valor_total ?? 0), 0);
+  const resumo = resumoPorEmpresa(todas.rows);
   const comEstoque = rows.filter((r) => r.estoque > 0).length;
   const topValor = [...rows].sort((a, b) => Number(b.valor_total ?? 0) - Number(a.valor_total ?? 0)).slice(0, 10).filter((r) => r.estoque > 0);
   const baixosZerados = baixos.filter((r) => r.estoque === 0).length;
@@ -46,21 +59,78 @@ export default async function RelatoriosPage({ searchParams }: { searchParams: P
           <input type="hidden" name="limite" value={limite} />
           <input type="hidden" name="top" value={top} />
           {zerados && <input type="hidden" name="zerados" value="1" />}
-          <Field label="Marca / cliente" htmlFor="marca" hint="Vale para TODOS os relatórios abaixo (telas e Excel).">
-            <Select id="marca" name="marca" defaultValue={marca} className="w-56">
-              <option value="">Todas as marcas</option>
-              {MARCAS.map((m) => (
+          <Field label="Empresa" htmlFor="empresa" hint="Vale para os relatórios abaixo (telas e Excel).">
+            <Select id="empresa" name="empresa" defaultValue={marca} className="w-56">
+              <option value="">Todas as empresas</option>
+              {EMPRESAS.map((m) => (
                 <option key={m} value={m}>{m}</option>
               ))}
+              <option value={SEM_EMPRESA}>{empresaLabel(SEM_EMPRESA)}</option>
+            </Select>
+          </Field>
+          <Field label="Versão do Excel" htmlFor="versao" hint="“Para operador” sai só com código, nome e quantidade.">
+            <Select id="versao" name="versao" defaultValue={versao} className="w-72">
+              <option value="completo">Completo — com valores (admin)</option>
+              <option value="operador">Para operador — sem valores</option>
             </Select>
           </Field>
           <Button type="submit" size="lg">Aplicar</Button>
           {marca && (
             <span className="mb-3 rounded-full border-2 border-orange-300 bg-orange-50 px-4 py-1.5 text-sm font-bold text-orange-900">
-              Filtrando: {marca}
+              Empresa: {empresaLabel(marca)}
+            </span>
+          )}
+          {versao === "operador" && (
+            <span className="mb-3 rounded-full border-2 border-slate-300 bg-slate-100 px-4 py-1.5 text-sm font-bold text-slate-800">
+              Excel sem valores
             </span>
           )}
         </form>
+      </Card>
+
+      {/* ------------------------------------------------ relatórios por empresa */}
+      <Card className="mb-6 overflow-hidden">
+        <CardHeader className="gap-3">
+          <div className="flex flex-wrap items-start justify-between gap-4">
+            <div>
+              <CardTitle className="flex items-center gap-2">
+                <Building2 className="h-5 w-5 text-brand" aria-hidden /> Relatórios por empresa
+              </CardTitle>
+              <CardDescription>
+                Cada empresa tem o seu relatório de estoque (itens com quantidade). O Excel sai na versão escolhida acima: {versao === "operador" ? "sem valores" : "com valores"}.
+              </CardDescription>
+            </div>
+            <Button asChild variant="dark">
+              <a href={`/relatorios/exportar?tipo=empresas${versao === "operador" ? "&versao=operador" : ""}`} download>
+                <Download className="h-5 w-5" aria-hidden /> Todas as empresas (1 aba por empresa)
+              </a>
+            </Button>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+            {resumo.map((e) => (
+              <div key={e.empresa} className="rounded-2xl border-2 border-slate-200 p-4">
+                <p className="text-lg font-extrabold uppercase tracking-wide">{empresaLabel(e.empresa)}</p>
+                <dl className="mt-2 grid grid-cols-3 gap-2 text-center">
+                  <div><dt className="text-xs text-slate-500">Itens</dt><dd className="text-xl font-extrabold tabular-nums">{formatNumber(e.comEstoque)}</dd></div>
+                  <div><dt className="text-xs text-slate-500">Peças</dt><dd className="text-xl font-extrabold tabular-nums">{formatNumber(e.pecas)}</dd></div>
+                  <div><dt className="text-xs text-slate-500">Valor</dt><dd className="text-sm font-extrabold tabular-nums">{formatBRL(e.valor)}</dd></div>
+                </dl>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <Button asChild size="sm" disabled={e.comEstoque === 0}>
+                    <a href={`/relatorios/exportar?tipo=estoque&empresa=${e.empresa}&soestoque=1${versao === "operador" ? "&versao=operador" : ""}`} download>
+                      <Download className="h-4 w-4" aria-hidden /> Excel
+                    </a>
+                  </Button>
+                  <Button asChild size="sm" variant="outline">
+                    <a href={`/relatorios?empresa=${e.empresa}${versao === "operador" ? "&versao=operador" : ""}`}>Ver na tela</a>
+                  </Button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </CardContent>
       </Card>
 
       <div className="grid gap-4 md:grid-cols-3">
@@ -90,7 +160,8 @@ export default async function RelatoriosPage({ searchParams }: { searchParams: P
           <form method="get" className="flex flex-wrap items-center gap-4">
             <input type="hidden" name="limite" value={limite} />
             <input type="hidden" name="top" value={top} />
-            {marca && <input type="hidden" name="marca" value={marca} />}
+            {marca && <input type="hidden" name="empresa" value={marca} />}
+            {versao === "operador" && <input type="hidden" name="versao" value="operador" />}
             <label className="flex min-h-12 items-center gap-3 font-semibold text-slate-700">
               <input type="checkbox" name="zerados" value="1" defaultChecked={zerados} className="h-6 w-6 accent-orange-600" />
               Incluir itens que já zeraram
@@ -147,7 +218,8 @@ export default async function RelatoriosPage({ searchParams }: { searchParams: P
           <form method="get" className="flex flex-wrap items-end gap-3">
             <input type="hidden" name="top" value={top} />
             {zerados && <input type="hidden" name="zerados" value="1" />}
-            {marca && <input type="hidden" name="marca" value={marca} />}
+            {marca && <input type="hidden" name="empresa" value={marca} />}
+            {versao === "operador" && <input type="hidden" name="versao" value="operador" />}
             <Field label="Mostrar itens com saldo abaixo de" htmlFor="limite">
               <Input id="limite" name="limite" type="number" min={1} inputMode="numeric" defaultValue={limite} className="w-40" />
             </Field>
@@ -203,7 +275,8 @@ export default async function RelatoriosPage({ searchParams }: { searchParams: P
           <form method="get" className="flex flex-wrap items-end gap-3">
             <input type="hidden" name="limite" value={limite} />
             {zerados && <input type="hidden" name="zerados" value="1" />}
-            {marca && <input type="hidden" name="marca" value={marca} />}
+            {marca && <input type="hidden" name="empresa" value={marca} />}
+            {versao === "operador" && <input type="hidden" name="versao" value="operador" />}
             <Field label="Mostrar os" htmlFor="top">
               <Select id="top" name="top" defaultValue={String(top)} className="w-40">
                 {TOP_OPTIONS.map((n) => (
@@ -214,7 +287,7 @@ export default async function RelatoriosPage({ searchParams }: { searchParams: P
             <Button type="submit" size="lg" variant="outline">Atualizar</Button>
           </form>
         </CardHeader>
-        <DataTable<StockReportRow>
+        <DataTable<StockRow>
           caption="Itens com maior quantidade em estoque"
           rows={maiores}
           rowKey={(r) => r.variant_id}
@@ -263,7 +336,8 @@ export default async function RelatoriosPage({ searchParams }: { searchParams: P
           <CardContent>
             <form action="/relatorios/exportar" method="get" className="flex flex-wrap items-end gap-3">
               <input type="hidden" name="tipo" value="movimentacoes" />
-              {marca && <input type="hidden" name="marca" value={marca} />}
+              {marca && <input type="hidden" name="empresa" value={marca} />}
+            {versao === "operador" && <input type="hidden" name="versao" value="operador" />}
               <Field label="De" htmlFor="r-from"><Input id="r-from" name="from" type="date" /></Field>
               <Field label="Até" htmlFor="r-to"><Input id="r-to" name="to" type="date" /></Field>
               <Button type="submit" size="lg" variant="dark">

@@ -38,7 +38,7 @@ const NAV: NavItem[] = [
   { href: "/produtos", label: "Produtos", icon: Shirt, admin: true },
   { href: "/ocs", label: "OCs", icon: FileText, admin: true },
   { href: "/contagem", label: "Contagem inicial", icon: ClipboardCheck, admin: true },
-  { href: "/relatorios", label: "Relatórios", icon: FileSpreadsheet, admin: true },
+  { href: "/relatorios", label: "Relatórios", icon: FileSpreadsheet },
   { href: "/usuarios", label: "Usuários", icon: Users, admin: true },
   { href: "/auditoria", label: "Auditoria", icon: ShieldCheck, admin: true },
 ];

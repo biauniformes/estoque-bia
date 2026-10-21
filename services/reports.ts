@@ -3,21 +3,20 @@ import ExcelJS from "exceljs";
 import { createClient } from "@/lib/supabase/server";
 import { categoryLabel, REASON_LABELS, STATUS_LABELS } from "@/lib/constants";
 import { dayEndISO, dayStartISO, isDate, variantLabel } from "@/lib/utils";
+import { applyEmpresa, EMPRESAS, empresaDe, empresaLabel, SEM_EMPRESA, type FiltroEmpresa } from "@/lib/empresas";
 import type { MovementRow, StockReportRow, StockRow } from "@/types";
 
-/** Marcas/clientes que aparecem no nome dos itens da lista de preços. */
-export const MARCAS = ["ORBENK", "SEPAT"] as const;
-export type Marca = (typeof MARCAS)[number];
-export function parseMarca(v: string | null | undefined): Marca | "" {
-  const u = (v ?? "").trim().toUpperCase();
-  return (MARCAS as readonly string[]).includes(u) ? (u as Marca) : "";
-}
+export { EMPRESAS, SEM_EMPRESA, parseEmpresa, empresaLabel, empresaDe, combinaEmpresa } from "@/lib/empresas";
+export type { FiltroEmpresa } from "@/lib/empresas";
 
 const PAGE = 1000;
 const MAX_ROWS = 100_000;
 
 const BRL_FORMAT = '"R$" #,##0.00';
 const INT_FORMAT = "#,##0";
+
+export const DEFAULT_LIMITE = 150;
+export const TOP_OPTIONS = [10, 20, 50, 100] as const;
 
 /** Lê todas as linhas de uma consulta paginando de 1000 em 1000 (limite do PostgREST). */
 async function fetchAll<T>(build: (from: number, to: number) => PromiseLike<{ data: unknown[] | null; error: { message: string } | null }>) {
@@ -42,11 +41,20 @@ function styleHeader(sheet: ExcelJS.Worksheet) {
   sheet.views = [{ state: "frozen", ySplit: 1 }];
 }
 
-export async function getStockSnapshot(marca: Marca | "" = "") {
+function styleTotals(row: ExcelJS.Row) {
+  row.font = { bold: true };
+  row.eachCell((c) => (c.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFFFE5CC" } }));
+}
+
+// ------------------------------------------------------------------ leituras
+
+/** Itens ativos com saldo. `soComEstoque` descarta os zerados. (Funciona para administrador e operador.) */
+export async function getStockSnapshot(empresa: FiltroEmpresa = "", soComEstoque = false) {
   const supabase = await createClient();
   const rows = await fetchAll<StockRow>((from, to) => {
     let q = supabase.from("stock_overview").select("*").eq("ativo", true);
-    if (marca) q = q.ilike("produto", `%${marca}%`);
+    q = applyEmpresa(q, empresa);
+    if (soComEstoque) q = q.gt("estoque", 0);
     return q.order("nome_base").order("tamanho_rank").order("produto").order("cor").order("tamanho_ordem").order("variant_id").range(from, to);
   });
   const pecas = rows.reduce((s, r) => s + r.estoque, 0);
@@ -54,9 +62,77 @@ export async function getStockSnapshot(marca: Marca | "" = "") {
   return { rows, pecas, valor };
 }
 
-/** Planilha "Estoque": uma linha por item, com valor unitário e total (fórmulas) e linha de totais. */
-export function buildStockSheet(workbook: ExcelJS.Workbook, rows: StockRow[], sheetName = "Estoque") {
-  const sheet = workbook.addWorksheet(sheetName);
+/** Itens JÁ MOVIMENTADOS (ao menos 1 movimentação no histórico) com saldo abaixo do limite (admin). */
+export async function getLowMovedItems(limite: number, empresa: FiltroEmpresa = "") {
+  const supabase = await createClient();
+  return fetchAll<StockReportRow>((from, to) => {
+    let q = supabase.from("stock_report").select("*").eq("ativo", true).gt("movimentos", 0).lt("estoque", limite);
+    q = applyEmpresa(q, empresa);
+    return q.order("estoque", { ascending: true }).order("nome_base").order("tamanho_rank").order("variant_id").range(from, to);
+  });
+}
+
+/** Itens com maior quantidade em estoque (admin e operador). */
+export async function getTopItems(top: number, empresa: FiltroEmpresa = "") {
+  const supabase = await createClient();
+  let q = supabase.from("stock_overview").select("*").eq("ativo", true).gt("estoque", 0);
+  q = applyEmpresa(q, empresa);
+  const { data, error } = await q.order("estoque", { ascending: false }).order("produto").order("variant_id").limit(top);
+  if (error) throw new Error(error.message);
+  return (data ?? []) as StockRow[];
+}
+
+/** Saldo ATUAL dos itens que já foram movimentados ao menos uma vez (admin). */
+export async function getMovedStock(incluirZerados: boolean, empresa: FiltroEmpresa = "") {
+  const supabase = await createClient();
+  const rows = await fetchAll<StockReportRow>((from, to) => {
+    let q = supabase.from("stock_report").select("*").eq("ativo", true).gt("movimentos", 0);
+    q = applyEmpresa(q, empresa);
+    if (!incluirZerados) q = q.gt("estoque", 0);
+    return q.order("nome_base").order("tamanho_rank").order("produto").order("variant_id").range(from, to);
+  });
+  const pecas = rows.reduce((s, r) => s + r.estoque, 0);
+  const valor = rows.reduce((s, r) => s + Number(r.valor_total ?? 0), 0);
+  return { rows, pecas, valor };
+}
+
+/** Resumo por empresa a partir de uma lista de itens (já em memória). */
+export function resumoPorEmpresa(rows: StockRow[]) {
+  const nomes = [...EMPRESAS, SEM_EMPRESA] as const;
+  return nomes.map((e) => {
+    const itens = rows.filter((r) => empresaDe(r.produto) === e);
+    const comEstoque = itens.filter((r) => r.estoque > 0);
+    return {
+      empresa: e as string,
+      cadastrados: itens.length,
+      comEstoque: comEstoque.length,
+      pecas: comEstoque.reduce((s, r) => s + r.estoque, 0),
+      valor: comEstoque.reduce((s, r) => s + Number(r.valor_total ?? 0), 0),
+    };
+  });
+}
+
+// ------------------------------------------------------------------ planilhas
+// Todas as planilhas aceitam `valores`. Com valores=false (versão do OPERADOR) saem SOMENTE
+// código, nome e quantidade — nenhuma coluna de preço/valor.
+
+/** Planilha de estoque: uma linha por item. */
+export function buildStockSheet(workbook: ExcelJS.Workbook, rows: StockRow[], sheetName = "Estoque", valores = true) {
+  const sheet = workbook.addWorksheet(sheetName.slice(0, 31));
+  if (!valores) {
+    sheet.columns = [
+      { header: "Código", key: "codigo", width: 14 },
+      { header: "Produto", key: "produto", width: 70 },
+      { header: "Quantidade", key: "estoque", width: 14, style: { numFmt: INT_FORMAT } },
+    ];
+    styleHeader(sheet);
+    rows.forEach((r) => sheet.addRow({ codigo: r.codigo, produto: r.produto, estoque: r.estoque }));
+    const last = rows.length + 1;
+    styleTotals(sheet.addRow({ produto: "TOTAL", estoque: { formula: `SUM(C2:C${last})`, result: rows.reduce((s, r) => s + r.estoque, 0) } }));
+    sheet.autoFilter = { from: "A1", to: `C${Math.max(last, 2)}` };
+    return rows.length;
+  }
+
   sheet.columns = [
     { header: "Código", key: "codigo", width: 14 },
     { header: "Produto", key: "produto", width: 62 },
@@ -69,7 +145,6 @@ export function buildStockSheet(workbook: ExcelJS.Workbook, rows: StockRow[], sh
     { header: "Situação", key: "status", width: 15 },
   ];
   styleHeader(sheet);
-
   rows.forEach((r, i) => {
     const line = i + 2;
     sheet.addRow({
@@ -84,25 +159,60 @@ export function buildStockSheet(workbook: ExcelJS.Workbook, rows: StockRow[], sh
       status: STATUS_LABELS[r.status],
     });
   });
-
   const last = rows.length + 1;
-  const totals = sheet.addRow({
-    produto: "TOTAL",
-    estoque: { formula: `SUM(E2:E${last})`, result: rows.reduce((s, r) => s + r.estoque, 0) },
-    total: { formula: `SUM(H2:H${last})`, result: rows.reduce((s, r) => s + Number(r.valor_total ?? 0), 0) },
-  });
-  totals.font = { bold: true };
-  totals.eachCell((c) => (c.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFFFE5CC" } }));
+  styleTotals(
+    sheet.addRow({
+      produto: "TOTAL",
+      estoque: { formula: `SUM(E2:E${last})`, result: rows.reduce((s, r) => s + r.estoque, 0) },
+      total: { formula: `SUM(H2:H${last})`, result: rows.reduce((s, r) => s + Number(r.valor_total ?? 0), 0) },
+    }),
+  );
   sheet.autoFilter = { from: "A1", to: `I${Math.max(last, 2)}` };
   return rows.length;
 }
 
-/** Planilha "Movimentações" do período (datas no horário de Brasília). */
-export async function buildMovementsSheet(workbook: ExcelJS.Workbook, from?: string, to?: string, marca: Marca | "" = "") {
+/** Uma aba por empresa (com estoque) + aba de resumo. */
+export function buildEmpresasWorkbook(workbook: ExcelJS.Workbook, rows: StockRow[], valores = true) {
+  const resumo = resumoPorEmpresa(rows);
+  const sheet = workbook.addWorksheet("Resumo");
+  sheet.columns = valores
+    ? [
+        { header: "Empresa", key: "e", width: 22 },
+        { header: "Itens com estoque", key: "n", width: 18, style: { numFmt: INT_FORMAT } },
+        { header: "Peças", key: "p", width: 14, style: { numFmt: INT_FORMAT } },
+        { header: "Valor em estoque", key: "v", width: 20, style: { numFmt: BRL_FORMAT } },
+      ]
+    : [
+        { header: "Empresa", key: "e", width: 22 },
+        { header: "Itens com estoque", key: "n", width: 18, style: { numFmt: INT_FORMAT } },
+        { header: "Peças", key: "p", width: 14, style: { numFmt: INT_FORMAT } },
+      ];
+  styleHeader(sheet);
+  resumo.forEach((r) => sheet.addRow({ e: empresaLabel(r.empresa), n: r.comEstoque, p: r.pecas, v: r.valor }));
+  const last = resumo.length + 1;
+  styleTotals(
+    sheet.addRow({
+      e: "TOTAL",
+      n: { formula: `SUM(B2:B${last})`, result: resumo.reduce((s, r) => s + r.comEstoque, 0) },
+      p: { formula: `SUM(C2:C${last})`, result: resumo.reduce((s, r) => s + r.pecas, 0) },
+      ...(valores ? { v: { formula: `SUM(D2:D${last})`, result: resumo.reduce((s, r) => s + r.valor, 0) } } : {}),
+    }),
+  );
+  let total = 0;
+  for (const r of resumo) {
+    const itens = rows.filter((x) => empresaDe(x.produto) === r.empresa && x.estoque > 0);
+    if (itens.length === 0) continue;
+    total += buildStockSheet(workbook, itens, empresaLabel(r.empresa), valores);
+  }
+  return total;
+}
+
+/** Planilha "Movimentações" do período (admin; datas no horário de Brasília). */
+export async function buildMovementsSheet(workbook: ExcelJS.Workbook, from?: string, to?: string, empresa: FiltroEmpresa = "") {
   const supabase = await createClient();
   const rows = await fetchAll<MovementRow>((a, b) => {
     let q = supabase.from("movements_detailed").select("*");
-    if (marca) q = q.ilike("produto", `%${marca}%`);
+    q = applyEmpresa(q, empresa);
     if (from && isDate(from)) q = q.gte("created_at", dayStartISO(from));
     if (to && isDate(to)) q = q.lte("created_at", dayEndISO(to));
     return q.order("created_at", { ascending: false }).order("id").range(a, b);
@@ -152,38 +262,25 @@ export function newWorkbook() {
   return wb;
 }
 
-// ------------------------------------------------------------------ relatórios de saldo
-
-
-export const DEFAULT_LIMITE = 150;
-export const TOP_OPTIONS = [10, 20, 50, 100] as const;
-
-/** Itens JÁ MOVIMENTADOS (ao menos 1 movimentação no histórico) com saldo abaixo do limite, do menor para o maior. */
-export async function getLowMovedItems(limite: number, marca: Marca | "" = "") {
-  const supabase = await createClient();
-  return fetchAll<StockReportRow>((from, to) => {
-    let q = supabase.from("stock_report").select("*").eq("ativo", true).gt("movimentos", 0).lt("estoque", limite);
-    if (marca) q = q.ilike("produto", `%${marca}%`);
-    return q.order("estoque", { ascending: true }).order("nome_base").order("tamanho_rank").order("variant_id").range(from, to);
-  });
-}
-
-/** Itens com maior quantidade em estoque. */
-export async function getTopItems(top: number, marca: Marca | "" = "") {
-  const supabase = await createClient();
-  let q = supabase.from("stock_report").select("*").eq("ativo", true).gt("estoque", 0);
-  if (marca) q = q.ilike("produto", `%${marca}%`);
-  const { data, error } = await q.order("estoque", { ascending: false }).order("produto").order("variant_id").limit(top);
-  if (error) throw new Error(error.message);
-  return (data ?? []) as StockReportRow[];
-}
-
 function dateBR(iso: string | null) {
   return iso ? new Date(new Date(iso).getTime() - 3 * 3_600_000) : null;
 }
 
-export function buildLowStockSheet(workbook: ExcelJS.Workbook, rows: StockReportRow[], limite: number) {
+export function buildLowStockSheet(workbook: ExcelJS.Workbook, rows: StockReportRow[], limite: number, valores = true) {
   const sheet = workbook.addWorksheet(`Abaixo de ${limite}`.slice(0, 31));
+  if (!valores) {
+    sheet.columns = [
+      { header: "Código", key: "codigo", width: 14 },
+      { header: "Produto", key: "produto", width: 70 },
+      { header: "Quantidade", key: "estoque", width: 14, style: { numFmt: INT_FORMAT } },
+    ];
+    styleHeader(sheet);
+    rows.forEach((r) => sheet.addRow({ codigo: r.codigo, produto: r.produto, estoque: r.estoque }));
+    const last = rows.length + 1;
+    styleTotals(sheet.addRow({ produto: `TOTAL (${rows.length} itens com saldo abaixo de ${limite})`, estoque: { formula: `SUM(C2:C${last})`, result: rows.reduce((s, r) => s + r.estoque, 0) } }));
+    sheet.autoFilter = { from: "A1", to: `C${Math.max(last, 2)}` };
+    return rows.length;
+  }
   sheet.columns = [
     { header: "Código", key: "codigo", width: 14 },
     { header: "Produto", key: "produto", width: 62 },
@@ -215,19 +312,31 @@ export function buildLowStockSheet(workbook: ExcelJS.Workbook, rows: StockReport
     });
   });
   const last = rows.length + 1;
-  const totals = sheet.addRow({
-    produto: `TOTAL (${rows.length} itens com saldo abaixo de ${limite})`,
-    estoque: { formula: `SUM(D2:D${last})`, result: rows.reduce((s, r) => s + r.estoque, 0) },
-    total: { formula: `SUM(J2:J${last})`, result: rows.reduce((s, r) => s + Number(r.valor_total ?? 0), 0) },
-  });
-  totals.font = { bold: true };
-  totals.eachCell((c) => (c.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFFFE5CC" } }));
+  styleTotals(
+    sheet.addRow({
+      produto: `TOTAL (${rows.length} itens com saldo abaixo de ${limite})`,
+      estoque: { formula: `SUM(D2:D${last})`, result: rows.reduce((s, r) => s + r.estoque, 0) },
+      total: { formula: `SUM(J2:J${last})`, result: rows.reduce((s, r) => s + Number(r.valor_total ?? 0), 0) },
+    }),
+  );
   sheet.autoFilter = { from: "A1", to: `K${Math.max(last, 2)}` };
   return rows.length;
 }
 
-export function buildTopStockSheet(workbook: ExcelJS.Workbook, rows: StockReportRow[], totalPecas: number) {
-  const sheet = workbook.addWorksheet(`Maiores estoques`);
+export function buildTopStockSheet(workbook: ExcelJS.Workbook, rows: StockRow[], totalPecas: number, valores = true) {
+  const sheet = workbook.addWorksheet("Maiores estoques");
+  if (!valores) {
+    sheet.columns = [
+      { header: "#", key: "pos", width: 6 },
+      { header: "Código", key: "codigo", width: 14 },
+      { header: "Produto", key: "produto", width: 70 },
+      { header: "Quantidade", key: "estoque", width: 14, style: { numFmt: INT_FORMAT } },
+    ];
+    styleHeader(sheet);
+    rows.forEach((r, i) => sheet.addRow({ pos: i + 1, codigo: r.codigo, produto: r.produto, estoque: r.estoque }));
+    sheet.autoFilter = { from: "A1", to: `D${Math.max(rows.length + 1, 2)}` };
+    return rows.length;
+  }
   sheet.columns = [
     { header: "#", key: "pos", width: 6 },
     { header: "Código", key: "codigo", width: 14 },
@@ -254,21 +363,4 @@ export function buildTopStockSheet(workbook: ExcelJS.Workbook, rows: StockReport
   });
   sheet.autoFilter = { from: "A1", to: `H${Math.max(rows.length + 1, 2)}` };
   return rows.length;
-}
-
-/**
- * Saldo ATUAL dos itens que já foram movimentados pelo menos uma vez (qualquer quantidade).
- * Por padrão só itens com saldo > 0; com `incluirZerados` entram também os que já zeraram.
- */
-export async function getMovedStock(incluirZerados: boolean, marca: Marca | "" = "") {
-  const supabase = await createClient();
-  const rows = await fetchAll<StockReportRow>((from, to) => {
-    let q = supabase.from("stock_report").select("*").eq("ativo", true).gt("movimentos", 0);
-    if (marca) q = q.ilike("produto", `%${marca}%`);
-    if (!incluirZerados) q = q.gt("estoque", 0);
-    return q.order("nome_base").order("tamanho_rank").order("produto").order("variant_id").range(from, to);
-  });
-  const pecas = rows.reduce((s, r) => s + r.estoque, 0);
-  const valor = rows.reduce((s, r) => s + Number(r.valor_total ?? 0), 0);
-  return { rows, pecas, valor };
 }
