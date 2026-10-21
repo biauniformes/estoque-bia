@@ -12,9 +12,13 @@ import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { registerOcExitAction, type OcExitResult } from "@/app/actions/movements";
 import { cn, formatNumber, newKey, normalizeOc, variantLabel } from "@/lib/utils";
 import { REASON_LABELS } from "@/lib/constants";
+import { EMPRESAS, SEM_EMPRESA, empresaDe, empresaLabel } from "@/lib/empresas";
+import { SECOES, secaoDe } from "@/lib/secoes";
 import type { StockRow } from "@/types";
 
 type Line = { id: string; qty: string };
+
+const EMPRESA_CHIPS = [...EMPRESAS, SEM_EMPRESA] as const;
 
 const norm = (s: string) => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
 
@@ -24,6 +28,22 @@ function parseLine(line: string): { code: string; qty: number } | null {
   return m ? { code: m[1], qty: parseInt(m[2], 10) } : null;
 }
 
+function FilterChip({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={active}
+      className={cn(
+        "min-h-11 rounded-xl border-2 px-4 text-sm font-bold transition-colors",
+        active ? "border-black bg-black text-white" : "border-slate-300 bg-white text-slate-700 hover:border-brand hover:bg-orange-50",
+      )}
+    >
+      {children}
+    </button>
+  );
+}
+
 export function OcExitForm({ variants, isAdmin }: { variants: StockRow[]; isAdmin: boolean }) {
   const router = useRouter();
   const [oc, setOc] = React.useState("");
@@ -31,6 +51,8 @@ export function OcExitForm({ variants, isAdmin }: { variants: StockRow[]; isAdmi
   const [obs, setObs] = React.useState("");
   const [lines, setLines] = React.useState<Line[]>([]);
   const [search, setSearch] = React.useState("");
+  const [empresa, setEmpresa] = React.useState<string>("");
+  const [secao, setSecao] = React.useState<string>("");
   const [overrides, setOverrides] = React.useState<Record<string, number>>({});
   const [confirmOpen, setConfirmOpen] = React.useState(false);
   const [pending, setPending] = React.useState(false);
@@ -54,17 +76,29 @@ export function OcExitForm({ variants, isAdmin }: { variants: StockRow[]; isAdmi
     setError(null);
   };
 
+  // empresa e seção de cada peça (deduzidas do nome), calculadas uma vez
+  const tags = React.useMemo(
+    () => new Map(variants.map((v) => [v.variant_id, { empresa: empresaDe(v.produto) as string, secao: secaoDe(v.produto) as string }])),
+    [variants],
+  );
+  const filtering = Boolean(empresa || secao);
+
   const allMatches = React.useMemo(() => {
     const tokens = norm(search.trim()).split(/\s+/).filter(Boolean);
-    if (tokens.length === 0) return [];
+    if (tokens.length === 0 && !empresa && !secao) return [];
     return variants
       .filter((v) => {
+        const t = tags.get(v.variant_id)!;
+        if (empresa && t.empresa !== empresa) return false;
+        if (secao && t.secao !== secao) return false;
+        if (tokens.length === 0) return true;
         const hay = norm(`${v.produto} ${v.codigo} ${v.sku}`);
-        return tokens.every((t) => hay.includes(t));
+        return tokens.every((tk) => hay.includes(tk));
       })
       .slice(0, 300);
-  }, [search, variants]);
-  const matches = allMatches.slice(0, 40);
+  }, [search, empresa, secao, variants, tags]);
+  const matches = allMatches.slice(0, filtering ? 120 : 40);
+  const listOpen = Boolean(search.trim()) || filtering;
 
   function focusQty(id: string) {
     setTimeout(() => {
@@ -99,6 +133,8 @@ export function OcExitForm({ variants, isAdmin }: { variants: StockRow[]; isAdmi
   /** Terminou de escolher: fecha a lista e vai para a primeira quantidade em branco. */
   function finishPicking() {
     setSearch("");
+    setEmpresa("");
+    setSecao("");
     const vazio = lines.find((l) => !(parseInt(l.qty || "0", 10) > 0));
     if (vazio) focusQty(vazio.id);
   }
@@ -287,6 +323,32 @@ export function OcExitForm({ variants, isAdmin }: { variants: StockRow[]; isAdmi
           </Button>
         </div>
 
+        <div className="mt-4 space-y-3">
+          <div>
+            <p className="mb-1.5 text-xs font-extrabold uppercase tracking-wide text-slate-500">Empresa</p>
+            <div className="flex flex-wrap gap-2">
+              {["", ...EMPRESA_CHIPS].map((e) => (
+                <FilterChip key={e || "todas"} active={empresa === e} onClick={() => setEmpresa(e)}>
+                  {e ? empresaLabel(e) : "Todas"}
+                </FilterChip>
+              ))}
+            </div>
+          </div>
+          <div>
+            <p className="mb-1.5 text-xs font-extrabold uppercase tracking-wide text-slate-500">Seção</p>
+            <div className="flex flex-wrap gap-2">
+              <FilterChip active={secao === ""} onClick={() => setSecao("")}>
+                Todas
+              </FilterChip>
+              {SECOES.map((s) => (
+                <FilterChip key={s.value} active={secao === s.value} onClick={() => setSecao(s.value)}>
+                  {s.label}
+                </FilterChip>
+              ))}
+            </div>
+          </div>
+        </div>
+
         <div className="relative mt-3">
           <Search className="pointer-events-none absolute left-4 top-1/2 h-6 w-6 -translate-y-1/2 text-slate-400" aria-hidden />
           <input
@@ -300,13 +362,13 @@ export function OcExitForm({ variants, isAdmin }: { variants: StockRow[]; isAdmi
                 addItem(matches[0].variant_id);
               }
             }}
-            placeholder="Buscar peças (nome ou código) — clique para marcar várias, ou Enter para a primeira"
+            placeholder="Buscar peças (nome ou código) — ou escolha empresa e seção acima"
             aria-label="Buscar peça para adicionar"
             autoComplete="off"
             className="h-14 w-full rounded-2xl border-2 border-slate-300 bg-white pl-12 pr-4 text-lg placeholder:text-slate-400 focus-visible:border-brand focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-orange-200"
           />
         </div>
-        {search.trim() && (
+        {listOpen && (
           <div className="mt-2 overflow-hidden rounded-2xl border-2 border-slate-200">
             <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 bg-slate-50 px-4 py-2">
               <p className="text-sm text-slate-600">
@@ -326,7 +388,7 @@ export function OcExitForm({ variants, isAdmin }: { variants: StockRow[]; isAdmi
               </div>
             </div>
             <ul className="max-h-96 divide-y divide-slate-100 overflow-y-auto" role="listbox" aria-multiselectable="true" aria-label="Peças encontradas">
-              {matches.length === 0 && <li className="px-4 py-4 text-slate-500">Nenhuma peça encontrada para “{search}”.</li>}
+              {matches.length === 0 && <li className="px-4 py-4 text-slate-500">Nenhuma peça encontrada{search.trim() ? <> para “{search}”</> : null}.</li>}
               {matches.map((v) => {
                 const jaTem = lines.some((l) => l.id === v.variant_id);
                 return (
