@@ -2,9 +2,10 @@ import "server-only";
 import { createClient } from "@/lib/supabase/server";
 import { PAGE_SIZE } from "@/lib/constants";
 import { applyBusca } from "@/lib/utils";
+import { applyEmpresa, parseEmpresa } from "@/lib/empresas";
 import type { StockRow } from "@/types";
 
-export type StockFilters = { q?: string; categoria?: string; cor?: string; tamanho?: string; status?: string; page?: number };
+export type StockFilters = { q?: string; categoria?: string; empresa?: string; cor?: string; tamanho?: string; status?: string; page?: number };
 
 // "variant_id" no fim desempata: sem ele, linhas iguais podem repetir ou sumir entre páginas
 const ORDER = ["nome_base", "tamanho_rank", "produto", "cor", "tamanho_ordem", "tamanho", "variant_id"] as const;
@@ -15,6 +16,7 @@ export async function listStock(f: StockFilters, pageSize = PAGE_SIZE) {
   let query = supabase.from("stock_overview").select("*", { count: "exact" }).eq("ativo", true);
   if (f.q) query = applyBusca(query, f.q);
   if (f.categoria) query = query.eq("categoria", f.categoria);
+  query = applyEmpresa(query, parseEmpresa(f.empresa));
   if (f.cor) query = query.eq("cor", f.cor);
   if (f.tamanho) query = query.eq("tamanho", f.tamanho);
   if (["normal", "baixo", "zerado"].includes(f.status ?? "")) query = query.eq("status", f.status as string);

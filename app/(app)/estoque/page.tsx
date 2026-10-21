@@ -4,6 +4,7 @@ import { requireUser } from "@/lib/auth/session";
 import { listStock, getStockFacets } from "@/services/stock";
 import { CATEGORIES, STATUS_LABELS } from "@/lib/constants";
 import { first, formatBRL, formatNumber, variantLabel } from "@/lib/utils";
+import { EMPRESAS, SEM_EMPRESA, empresaLabel } from "@/lib/empresas";
 import { PageHeader } from "@/components/shared/page-header";
 import { Card } from "@/components/ui/card";
 import { Filters, type FilterField } from "@/components/shared/filters";
@@ -23,6 +24,7 @@ export default async function EstoquePage({ searchParams }: { searchParams: Prom
   const params = {
     q: first(sp.q),
     categoria: first(sp.categoria),
+    empresa: first(sp.empresa),
     cor: first(sp.cor),
     tamanho: first(sp.tamanho),
     status: first(sp.status),
@@ -35,6 +37,13 @@ export default async function EstoquePage({ searchParams }: { searchParams: Prom
   const meaningful = (list: string[]) => list.filter((v) => variantLabel(v, v) !== "");
   const fields: FilterField[] = [
     { name: "q", label: "Produto", type: "search", placeholder: "Nome, código ou SKU" },
+    {
+      name: "empresa",
+      label: "Empresa",
+      type: "select",
+      allLabel: "Todas as empresas",
+      options: [...EMPRESAS.map((e) => ({ value: e, label: e })), { value: SEM_EMPRESA, label: empresaLabel(SEM_EMPRESA) }],
+    },
     { name: "categoria", label: "Categoria", type: "select", options: CATEGORIES.map((c) => ({ value: c.value, label: c.label })) },
     ...(meaningful(facets.cores).length > 0
       ? ([{ name: "cor", label: "Cor", type: "select", options: meaningful(facets.cores).map((c) => ({ value: c, label: c })) }] as FilterField[])
