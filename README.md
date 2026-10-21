@@ -70,9 +70,10 @@ Execute **em ordem** no **SQL Editor** do Supabase (ou com `supabase db push` se
 7. `supabase/migrations/0007_saida_oc_lote.sql` — Saída por OC em lote (tudo ou nada) e OC obrigatória em toda saída de quem não é administrador
 8. `supabase/migrations/0008_saida_lote_oc_opcional_admin.sql` — no lote, a OC é opcional para administrador (com escolha do motivo)
 9. `supabase/migrations/0009_relatorio_historico.sql` — base dos relatórios de saldo (view `stock_report`: saldo + histórico de movimentações)
+11. `supabase/migrations/0011_valor_somente_admin.sql` — o valor unitário só é legível por administrador, no nível do banco (products_admin, product_price)
 10. `supabase/migrations/0010_valores_pendentes.sql` — itens "aguardando valor" / "revisar valor" (tela Produtos → Valores pendentes e alerta no dashboard) e limpeza segura de itens nunca movimentados
 
-`supabase/setup_completo.sql` reúne 0001–0010 num arquivo só (instalação nova, **sem** dados fictícios).
+`supabase/setup_completo.sql` reúne 0001–0011 num arquivo só (instalação nova, **sem** dados fictícios).
 `supabase/seed/01_catalog.sql` é um catálogo fictício **opcional**, só para demonstração.
 
 ## Importar o catálogo real (planilha) e remover os dados fictícios
@@ -92,7 +93,7 @@ Pode ser repetido: itens novos são criados e nome/valor dos existentes são atu
 
 ## Relatórios (Excel)
 
-Menu **Relatórios** (administrador): baixa **Estoque atual** (código, produto, quantidade, valor unitário, valor total com fórmulas, situação e linha de totais) e **Movimentações** por período. Também traz **Estoque dos itens já movimentados** (saldo atual de quem já teve ao menos uma movimentação, com opção de incluir zerados), **Itens movimentados com saldo abaixo de N** (padrão 150, ajustável; só itens com ao menos uma movimentação no histórico) e **Peças com maior quantidade em estoque** (top 10/20/50/100), ambos com exportação em Excel. Cada exportação fica registrada na auditoria.
+Menu **Relatórios** (administrador): baixa **Estoque atual** (código, produto, quantidade, valor unitário, valor total com fórmulas, situação e linha de totais) e **Movimentações** por período. Também traz **Estoque dos itens já movimentados** (saldo atual de quem já teve ao menos uma movimentação, com opção de incluir zerados), **Itens movimentados com saldo abaixo de N** (padrão 150, ajustável; só itens com ao menos uma movimentação no histórico) e **Peças com maior quantidade em estoque** (top 10/20/50/100), ambos com exportação em Excel. O filtro **Marca / cliente (ORBENK ou SEPAT)** vale para todos os relatórios (telas e Excel). Cada exportação fica registrada na auditoria.
 
 ## Criação dos usuários e dados fictícios (opcional — só demonstração)
 

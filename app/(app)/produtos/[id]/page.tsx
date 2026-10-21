@@ -30,7 +30,7 @@ export default async function ProductDetailPage({
   const aviso = first((await searchParams).aviso);
   const supabase = await createClient();
 
-  const { data: product } = await supabase.from("products").select("*").eq("id", id).maybeSingle();
+  const { data: product } = await supabase.from("products_admin").select("*").eq("id", id).maybeSingle();
   if (!product) notFound();
   const [{ data: variants }, { data: stock }] = await Promise.all([
     supabase.from("product_variants").select("*").eq("product_id", id).order("cor").order("tamanho"),

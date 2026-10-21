@@ -475,7 +475,7 @@ async function main() {
   ok("dashboard conta itens aguardando valor", dpend.aguardando_valor === 1, JSON.stringify(dpend.aguardando_valor));
   ok("dashboard lista itens para revisar valor", Array.isArray(dpend.revisar_valor) && dpend.revisar_valor.length === 1 && dpend.revisar_valor[0].codigo === "500.002.00", JSON.stringify(dpend.revisar_valor));
   await db.exec("update products set valor_unitario = 22.5 where codigo = '500.001.00'");
-  const ativ = (await rows<Record<string, any>>("select ativo, valor_pendente, valor_unitario from products where codigo='500.001.00'"))[0];
+  const ativ = (await rows<Record<string, any>>("select ativo, valor_pendente, valor_unitario from products_admin where codigo='500.001.00'"))[0];
   ok("informar o valor ativa o item e limpa a marca 'aguardando'", ativ.ativo === true && ativ.valor_pendente === null && Number(ativ.valor_unitario) === 22.5, JSON.stringify(ativ));
   await db.exec("update products set nome = 'Item provisório (renomeado)' where codigo = '500.002.00'");
   ok("mudar só o nome NÃO limpa o alerta de revisão", (await rows("select 1 from products where codigo='500.002.00' and valor_pendente='revisar'")).length === 1);
@@ -490,6 +490,38 @@ async function main() {
   ok("limpeza apaga só o item nunca movimentado (1 apagado, 1 ignorado)", lim.apagados === 1 && lim.ignorados === 1, JSON.stringify(lim));
   ok("item com movimentação continua existindo; o outro sumiu", (await rows("select 1 from products where codigo='500.004.00'")).length === 1 && (await rows("select 1 from products where codigo='500.003.00'")).length === 0);
   await expectError("saldo continua protegido depois da limpeza", () => db.exec("update stock_balances set quantidade = 99"), /SALDO_PROTEGIDO/);
+
+
+  console.log("\nValor unitário SOMENTE para administrador (nível do banco)");
+  await db.exec("reset role");
+  await db.exec("update products set valor_unitario = 77.7, ativo = true where codigo = '500.004.00'");
+  await as(OP1);
+  await expectError("operador NÃO lê products.valor_unitario", () => rows("select valor_unitario from products"), /permission denied/);
+  await expectError("operador NÃO lê products com select *", () => rows("select * from products"), /permission denied/);
+  const opCols = await rows("select codigo, nome, categoria, ativo from products limit 3");
+  ok("operador ainda lê as colunas comuns de products", opCols.length === 3);
+  const opAdminView = await rows("select * from products_admin");
+  ok("operador recebe 0 linhas em products_admin", opAdminView.length === 0);
+  await expectError("operador NÃO escreve valor (RLS/privilégio)", () => db.exec("update products set valor_unitario = 1 where codigo='500.004.00'").then(async () => { await db.exec("reset role"); const v = await rows<{ valor_unitario: string }>("select valor_unitario from products where codigo='500.004.00'"); if (Number(v[0].valor_unitario) === 77.7) throw new Error("permission denied (sem efeito)"); }), /permission denied/);
+  const opOverview = await rows<Record<string, any>>("select estoque, valor_unitario, valor_total from stock_overview where sku='500.004.00'");
+  ok("operador lê o estoque normalmente, com valor NULL", opOverview.length === 1 && opOverview[0].valor_unitario === null && opOverview[0].valor_total === null, JSON.stringify(opOverview));
+  const opRep = await rows<Record<string, any>>("select estoque, valor_total from stock_report where sku='500.004.00'");
+  ok("operador em stock_report também sem valor", opRep.length === 1 && opRep[0].valor_total === null);
+  const opFn = await rows<{ v: string | null }>("select public.product_price(id) as v from products where codigo='500.004.00'");
+  ok("product_price() devolve NULL para operador", opFn[0].v === null);
+  await as(ADMIN);
+  const admView = await rows<Record<string, any>>("select codigo, valor_unitario from products_admin where codigo='500.004.00'");
+  ok("admin lê o valor por products_admin (77,70)", admView.length === 1 && Number(admView[0].valor_unitario) === 77.7, JSON.stringify(admView));
+  const admOv = await rows<Record<string, any>>("select valor_unitario, valor_total, estoque from stock_overview where sku='500.004.00'");
+  ok("admin vê valor e total em stock_overview (3 un. x 77,70 = 233,10)", Number(admOv[0].valor_unitario) === 77.7 && Math.abs(Number(admOv[0].valor_total) - 233.1) < 0.001, JSON.stringify(admOv));
+  await expectError("nem o admin lê products.valor_unitario direto (usa products_admin)", () => rows("select valor_unitario from products"), /permission denied/);
+  await db.exec("update products set valor_unitario = 80 where codigo = '500.004.00'");
+  const adm2 = await rows<Record<string, any>>("select valor_unitario from products_admin where codigo='500.004.00'");
+  ok("admin consegue ALTERAR o valor", Number(adm2[0].valor_unitario) === 80);
+  const ins = await rows<{ id: string }>("insert into products (codigo,nome,categoria,valor_unitario) values ('600.001.00','Novo pelo admin','outros',12.5) returning id");
+  ok("admin cadastra produto (insert … returning id) normalmente", ins.length === 1);
+  const dash11 = (await rows<{ d: Record<string, any> }>("select public.dashboard_summary() as d"))[0].d;
+  ok("dashboard continua calculando o valor total", Number(dash11.valor_total) > 0, JSON.stringify(dash11.valor_total));
 
   console.log(`\n${passed} ok, ${failed} falhas`);
   process.exit(failed ? 1 : 0);

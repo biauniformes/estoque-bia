@@ -12,6 +12,7 @@ import {
   getStockSnapshot,
   getTopItems,
   newWorkbook,
+  parseMarca,
 } from "@/services/reports";
 import { isDate } from "@/lib/utils";
 
@@ -30,6 +31,8 @@ export async function GET(request: Request) {
   const url = new URL(request.url);
   const tipoParam = url.searchParams.get("tipo");
   const tipo = (["movimentacoes", "baixo", "maiores", "movimentados"] as const).find((t) => t === tipoParam) ?? "estoque";
+  const marca = parseMarca(url.searchParams.get("marca"));
+  const sufixo = marca ? `-${marca.toLowerCase()}` : "";
   const limiteRaw = parseInt(url.searchParams.get("limite") ?? "", 10);
   const limite = Number.isFinite(limiteRaw) && limiteRaw > 0 ? Math.min(limiteRaw, 1_000_000) : DEFAULT_LIMITE;
   const topRaw = parseInt(url.searchParams.get("top") ?? "", 10);
@@ -44,22 +47,22 @@ export async function GET(request: Request) {
   let nome: string;
   try {
     if (tipo === "estoque") {
-      linhas = buildStockSheet(wb, (await getStockSnapshot()).rows);
-      nome = `estoque-bia-${todayBR()}.xlsx`;
+      linhas = buildStockSheet(wb, (await getStockSnapshot(marca)).rows, marca ? `Estoque ${marca}` : "Estoque");
+      nome = `estoque-bia${sufixo}-${todayBR()}.xlsx`;
     } else if (tipo === "movimentados") {
-      const { rows } = await getMovedStock(url.searchParams.get("zerados") === "1");
+      const { rows } = await getMovedStock(url.searchParams.get("zerados") === "1", marca);
       linhas = buildStockSheet(wb, rows, "Itens movimentados");
-      nome = `estoque-itens-movimentados-${todayBR()}.xlsx`;
+      nome = `estoque-itens-movimentados${sufixo}-${todayBR()}.xlsx`;
     } else if (tipo === "baixo") {
-      linhas = buildLowStockSheet(wb, await getLowMovedItems(limite), limite);
-      nome = `estoque-abaixo-de-${limite}-${todayBR()}.xlsx`;
+      linhas = buildLowStockSheet(wb, await getLowMovedItems(limite, marca), limite);
+      nome = `estoque-abaixo-de-${limite}${sufixo}-${todayBR()}.xlsx`;
     } else if (tipo === "maiores") {
-      const [itens, snap] = await Promise.all([getTopItems(top), getStockSnapshot()]);
+      const [itens, snap] = await Promise.all([getTopItems(top, marca), getStockSnapshot(marca)]);
       linhas = buildTopStockSheet(wb, itens, snap.pecas);
-      nome = `maiores-estoques-top${top}-${todayBR()}.xlsx`;
+      nome = `maiores-estoques-top${top}${sufixo}-${todayBR()}.xlsx`;
     } else {
-      linhas = await buildMovementsSheet(wb, from, to);
-      nome = `movimentacoes-bia-${from ?? "inicio"}_a_${to ?? todayBR()}.xlsx`;
+      linhas = await buildMovementsSheet(wb, from, to, marca);
+      nome = `movimentacoes-bia${sufixo}-${from ?? "inicio"}_a_${to ?? todayBR()}.xlsx`;
     }
   } catch {
     return new Response("Não foi possível gerar a planilha.", { status: 500 });
@@ -71,7 +74,7 @@ export async function GET(request: Request) {
     p_action: "exportacao_relatorio",
     p_entity_type: "relatorio",
     p_entity_id: null,
-    p_metadata: { relatorio: tipo, linhas, de: from ?? null, ate: to ?? null, zerados: tipo === "movimentados" ? url.searchParams.get("zerados") === "1" : null, limite: tipo === "baixo" ? limite : null, top: tipo === "maiores" ? top : null, arquivo: nome },
+    p_metadata: { relatorio: tipo, linhas, de: from ?? null, ate: to ?? null, marca: marca || null, zerados: tipo === "movimentados" ? url.searchParams.get("zerados") === "1" : null, limite: tipo === "baixo" ? limite : null, top: tipo === "maiores" ? top : null, arquivo: nome },
     p_ip: ip,
     p_ua: ua,
   });

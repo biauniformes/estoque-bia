@@ -25,7 +25,7 @@ export default async function ProdutosPage({ searchParams }: { searchParams: Pro
   const page = parsePage(first(sp.page));
   const supabase = await createClient();
 
-  let query = supabase.from("products").select("*, product_variants(id, ativo)", { count: "exact" });
+  let query = supabase.from("products").select("id, codigo, nome, categoria, descricao, ativo, valor_pendente, created_at, updated_at, product_variants(id, ativo)", { count: "exact" });
   if (params.q) {
     const t = safeLike(params.q);
     if (t) query = query.or(`nome.ilike.%${t}%,codigo.ilike.%${t}%`);

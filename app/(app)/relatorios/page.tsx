@@ -1,6 +1,6 @@
 import { AlertTriangle, Banknote, Boxes, Download, FileSpreadsheet, Package, Trophy } from "lucide-react";
 import { requireAdmin } from "@/lib/auth/session";
-import { DEFAULT_LIMITE, TOP_OPTIONS, getLowMovedItems, getMovedStock, getStockSnapshot, getTopItems } from "@/services/reports";
+import { DEFAULT_LIMITE, MARCAS, TOP_OPTIONS, getLowMovedItems, getMovedStock, getStockSnapshot, getTopItems, parseMarca } from "@/services/reports";
 import { first, formatBRL, formatDateTime, formatNumber, variantLabel } from "@/lib/utils";
 import { PageHeader, StatCard } from "@/components/shared/page-header";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -24,12 +24,14 @@ export default async function RelatoriosPage({ searchParams }: { searchParams: P
   const top = (TOP_OPTIONS as readonly number[]).includes(topRaw) ? topRaw : 20;
 
   const zerados = first(sp.zerados) === "1";
+  const marca = parseMarca(first(sp.marca));
+  const mq = marca ? `&marca=${marca}` : "";
 
   const [{ rows, pecas, valor }, baixos, maiores, movidos] = await Promise.all([
-    getStockSnapshot(),
-    getLowMovedItems(limite),
-    getTopItems(top),
-    getMovedStock(zerados),
+    getStockSnapshot(marca),
+    getLowMovedItems(limite, marca),
+    getTopItems(top, marca),
+    getMovedStock(zerados, marca),
   ]);
   const comEstoque = rows.filter((r) => r.estoque > 0).length;
   const topValor = [...rows].sort((a, b) => Number(b.valor_total ?? 0) - Number(a.valor_total ?? 0)).slice(0, 10).filter((r) => r.estoque > 0);
@@ -38,6 +40,28 @@ export default async function RelatoriosPage({ searchParams }: { searchParams: P
   return (
     <>
       <PageHeader title="Relatórios" description="Exporte os dados atualizados do sistema para Excel." />
+
+      <Card className="mb-6 p-5">
+        <form method="get" className="flex flex-wrap items-end gap-3">
+          <input type="hidden" name="limite" value={limite} />
+          <input type="hidden" name="top" value={top} />
+          {zerados && <input type="hidden" name="zerados" value="1" />}
+          <Field label="Marca / cliente" htmlFor="marca" hint="Vale para TODOS os relatórios abaixo (telas e Excel).">
+            <Select id="marca" name="marca" defaultValue={marca} className="w-56">
+              <option value="">Todas as marcas</option>
+              {MARCAS.map((m) => (
+                <option key={m} value={m}>{m}</option>
+              ))}
+            </Select>
+          </Field>
+          <Button type="submit" size="lg">Aplicar</Button>
+          {marca && (
+            <span className="mb-3 rounded-full border-2 border-orange-300 bg-orange-50 px-4 py-1.5 text-sm font-bold text-orange-900">
+              Filtrando: {marca}
+            </span>
+          )}
+        </form>
+      </Card>
 
       <div className="grid gap-4 md:grid-cols-3">
         <StatCard label="Itens cadastrados" value={formatNumber(rows.length)} icon={<FileSpreadsheet className="h-7 w-7" />} hint={`${formatNumber(comEstoque)} com estoque`} />
@@ -58,7 +82,7 @@ export default async function RelatoriosPage({ searchParams }: { searchParams: P
               </CardDescription>
             </div>
             <Button asChild variant="dark">
-              <a href={`/relatorios/exportar?tipo=movimentados${zerados ? "&zerados=1" : ""}`} download>
+              <a href={`/relatorios/exportar?tipo=movimentados${zerados ? "&zerados=1" : ""}${mq}`} download>
                 <Download className="h-5 w-5" aria-hidden /> Baixar Excel
               </a>
             </Button>
@@ -66,6 +90,7 @@ export default async function RelatoriosPage({ searchParams }: { searchParams: P
           <form method="get" className="flex flex-wrap items-center gap-4">
             <input type="hidden" name="limite" value={limite} />
             <input type="hidden" name="top" value={top} />
+            {marca && <input type="hidden" name="marca" value={marca} />}
             <label className="flex min-h-12 items-center gap-3 font-semibold text-slate-700">
               <input type="checkbox" name="zerados" value="1" defaultChecked={zerados} className="h-6 w-6 accent-orange-600" />
               Incluir itens que já zeraram
@@ -114,7 +139,7 @@ export default async function RelatoriosPage({ searchParams }: { searchParams: P
               </CardDescription>
             </div>
             <Button asChild variant="dark">
-              <a href={`/relatorios/exportar?tipo=baixo&limite=${limite}`} download>
+              <a href={`/relatorios/exportar?tipo=baixo&limite=${limite}${mq}`} download>
                 <Download className="h-5 w-5" aria-hidden /> Baixar Excel
               </a>
             </Button>
@@ -122,6 +147,7 @@ export default async function RelatoriosPage({ searchParams }: { searchParams: P
           <form method="get" className="flex flex-wrap items-end gap-3">
             <input type="hidden" name="top" value={top} />
             {zerados && <input type="hidden" name="zerados" value="1" />}
+            {marca && <input type="hidden" name="marca" value={marca} />}
             <Field label="Mostrar itens com saldo abaixo de" htmlFor="limite">
               <Input id="limite" name="limite" type="number" min={1} inputMode="numeric" defaultValue={limite} className="w-40" />
             </Field>
@@ -169,7 +195,7 @@ export default async function RelatoriosPage({ searchParams }: { searchParams: P
               <CardDescription>Ranking dos itens com mais unidades em estoque agora.</CardDescription>
             </div>
             <Button asChild variant="dark">
-              <a href={`/relatorios/exportar?tipo=maiores&top=${top}`} download>
+              <a href={`/relatorios/exportar?tipo=maiores&top=${top}${mq}`} download>
                 <Download className="h-5 w-5" aria-hidden /> Baixar Excel
               </a>
             </Button>
@@ -177,6 +203,7 @@ export default async function RelatoriosPage({ searchParams }: { searchParams: P
           <form method="get" className="flex flex-wrap items-end gap-3">
             <input type="hidden" name="limite" value={limite} />
             {zerados && <input type="hidden" name="zerados" value="1" />}
+            {marca && <input type="hidden" name="marca" value={marca} />}
             <Field label="Mostrar os" htmlFor="top">
               <Select id="top" name="top" defaultValue={String(top)} className="w-40">
                 {TOP_OPTIONS.map((n) => (
@@ -221,7 +248,7 @@ export default async function RelatoriosPage({ searchParams }: { searchParams: P
           </CardHeader>
           <CardContent>
             <Button asChild size="lg">
-              <a href="/relatorios/exportar?tipo=estoque" download>
+              <a href={`/relatorios/exportar?tipo=estoque${mq}`} download>
                 <Download className="h-5 w-5" aria-hidden /> Baixar estoque (Excel)
               </a>
             </Button>
@@ -236,6 +263,7 @@ export default async function RelatoriosPage({ searchParams }: { searchParams: P
           <CardContent>
             <form action="/relatorios/exportar" method="get" className="flex flex-wrap items-end gap-3">
               <input type="hidden" name="tipo" value="movimentacoes" />
+              {marca && <input type="hidden" name="marca" value={marca} />}
               <Field label="De" htmlFor="r-from"><Input id="r-from" name="from" type="date" /></Field>
               <Field label="Até" htmlFor="r-to"><Input id="r-to" name="to" type="date" /></Field>
               <Button type="submit" size="lg" variant="dark">

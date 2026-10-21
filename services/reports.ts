@@ -5,6 +5,14 @@ import { categoryLabel, REASON_LABELS, STATUS_LABELS } from "@/lib/constants";
 import { dayEndISO, dayStartISO, isDate, variantLabel } from "@/lib/utils";
 import type { MovementRow, StockReportRow, StockRow } from "@/types";
 
+/** Marcas/clientes que aparecem no nome dos itens da lista de preços. */
+export const MARCAS = ["ORBENK", "SEPAT"] as const;
+export type Marca = (typeof MARCAS)[number];
+export function parseMarca(v: string | null | undefined): Marca | "" {
+  const u = (v ?? "").trim().toUpperCase();
+  return (MARCAS as readonly string[]).includes(u) ? (u as Marca) : "";
+}
+
 const PAGE = 1000;
 const MAX_ROWS = 100_000;
 
@@ -34,20 +42,13 @@ function styleHeader(sheet: ExcelJS.Worksheet) {
   sheet.views = [{ state: "frozen", ySplit: 1 }];
 }
 
-export async function getStockSnapshot() {
+export async function getStockSnapshot(marca: Marca | "" = "") {
   const supabase = await createClient();
-  const rows = await fetchAll<StockRow>((from, to) =>
-    supabase
-      .from("stock_overview")
-      .select("*")
-      .eq("ativo", true)
-      .order("nome_base")
-      .order("tamanho_rank")
-      .order("produto")
-      .order("cor")
-      .order("tamanho_ordem")
-      .range(from, to),
-  );
+  const rows = await fetchAll<StockRow>((from, to) => {
+    let q = supabase.from("stock_overview").select("*").eq("ativo", true);
+    if (marca) q = q.ilike("produto", `%${marca}%`);
+    return q.order("nome_base").order("tamanho_rank").order("produto").order("cor").order("tamanho_ordem").range(from, to);
+  });
   const pecas = rows.reduce((s, r) => s + r.estoque, 0);
   const valor = rows.reduce((s, r) => s + Number(r.valor_total ?? 0), 0);
   return { rows, pecas, valor };
@@ -97,10 +98,11 @@ export function buildStockSheet(workbook: ExcelJS.Workbook, rows: StockRow[], sh
 }
 
 /** Planilha "Movimentações" do período (datas no horário de Brasília). */
-export async function buildMovementsSheet(workbook: ExcelJS.Workbook, from?: string, to?: string) {
+export async function buildMovementsSheet(workbook: ExcelJS.Workbook, from?: string, to?: string, marca: Marca | "" = "") {
   const supabase = await createClient();
   const rows = await fetchAll<MovementRow>((a, b) => {
     let q = supabase.from("movements_detailed").select("*");
+    if (marca) q = q.ilike("produto", `%${marca}%`);
     if (from && isDate(from)) q = q.gte("created_at", dayStartISO(from));
     if (to && isDate(to)) q = q.lte("created_at", dayEndISO(to));
     return q.order("created_at", { ascending: false }).range(a, b);
@@ -157,33 +159,21 @@ export const DEFAULT_LIMITE = 150;
 export const TOP_OPTIONS = [10, 20, 50, 100] as const;
 
 /** Itens JÁ MOVIMENTADOS (ao menos 1 movimentação no histórico) com saldo abaixo do limite, do menor para o maior. */
-export async function getLowMovedItems(limite: number) {
+export async function getLowMovedItems(limite: number, marca: Marca | "" = "") {
   const supabase = await createClient();
-  return fetchAll<StockReportRow>((from, to) =>
-    supabase
-      .from("stock_report")
-      .select("*")
-      .eq("ativo", true)
-      .gt("movimentos", 0)
-      .lt("estoque", limite)
-      .order("estoque", { ascending: true })
-      .order("nome_base")
-      .order("tamanho_rank")
-      .range(from, to),
-  );
+  return fetchAll<StockReportRow>((from, to) => {
+    let q = supabase.from("stock_report").select("*").eq("ativo", true).gt("movimentos", 0).lt("estoque", limite);
+    if (marca) q = q.ilike("produto", `%${marca}%`);
+    return q.order("estoque", { ascending: true }).order("nome_base").order("tamanho_rank").range(from, to);
+  });
 }
 
 /** Itens com maior quantidade em estoque. */
-export async function getTopItems(top: number) {
+export async function getTopItems(top: number, marca: Marca | "" = "") {
   const supabase = await createClient();
-  const { data, error } = await supabase
-    .from("stock_report")
-    .select("*")
-    .eq("ativo", true)
-    .gt("estoque", 0)
-    .order("estoque", { ascending: false })
-    .order("produto")
-    .limit(top);
+  let q = supabase.from("stock_report").select("*").eq("ativo", true).gt("estoque", 0);
+  if (marca) q = q.ilike("produto", `%${marca}%`);
+  const { data, error } = await q.order("estoque", { ascending: false }).order("produto").limit(top);
   if (error) throw new Error(error.message);
   return (data ?? []) as StockReportRow[];
 }
@@ -270,10 +260,11 @@ export function buildTopStockSheet(workbook: ExcelJS.Workbook, rows: StockReport
  * Saldo ATUAL dos itens que já foram movimentados pelo menos uma vez (qualquer quantidade).
  * Por padrão só itens com saldo > 0; com `incluirZerados` entram também os que já zeraram.
  */
-export async function getMovedStock(incluirZerados: boolean) {
+export async function getMovedStock(incluirZerados: boolean, marca: Marca | "" = "") {
   const supabase = await createClient();
   const rows = await fetchAll<StockReportRow>((from, to) => {
     let q = supabase.from("stock_report").select("*").eq("ativo", true).gt("movimentos", 0);
+    if (marca) q = q.ilike("produto", `%${marca}%`);
     if (!incluirZerados) q = q.gt("estoque", 0);
     return q.order("nome_base").order("tamanho_rank").order("produto").range(from, to);
   });

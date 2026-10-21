@@ -30,7 +30,7 @@ export default async function ValoresPendentesPage({ searchParams }: { searchPar
     (await supabase.from("products").select("id", { count: "exact", head: true }).eq("valor_pendente", t)).count ?? 0;
   const [nAguardando, nRevisar] = await Promise.all([count("aguardando"), count("revisar")]);
 
-  let query = supabase.from("products").select("id,codigo,nome,valor_unitario,valor_pendente", { count: "exact" }).eq("valor_pendente", tipo);
+  let query = supabase.from("products_admin").select("id,codigo,nome,valor_unitario,valor_pendente", { count: "exact" }).eq("valor_pendente", tipo);
   if (q) {
     const t = safeLike(q);
     if (t) query = query.or(`nome.ilike.%${t}%,codigo.ilike.%${t}%`);
