@@ -1,0 +1,8 @@
+[{
+  "relation": ["delegate_permission/common.handle_all_urls"],
+  "target": {
+    "namespace": "android_app",
+    "package_name": "br.com.biauniformes.estoque",
+    "sha256_cert_fingerprints": ["CB:4E:94:6A:A6:F8:DF:80:36:D1:2F:21:18:AD:B1:10:1A:34:6D:8C:87:34:82:44:79:CE:6D:64:0F:CF:87:96"]
+  }
+}]
