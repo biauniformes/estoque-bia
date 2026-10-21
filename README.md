@@ -232,3 +232,15 @@ OCs como texto normalizado (podem virar tabela `purchase_orders` ligada por `oc_
 
 **Limites conhecidos da v1:** os formulários de entrada/saída carregam todas as variações ativas de uma vez (ok para alguns milhares; acima disso, trocar por busca no servidor);
 não há recuperação de senha por e-mail (um administrador redefine em Usuários).
+
+## App Android (instalável / APK)
+
+O sistema é um **PWA**: no Chrome do celular/tablet, abra o endereço do sistema e toque em **Instalar app** (ou ⋮ → *Adicionar à tela inicial*). Ele abre em tela cheia, com a logo da Bia, e **atualiza sozinho** a cada publicação na Vercel.
+
+**Gerar o APK (uso interno, sem Play Store):**
+1. Abra <https://www.pwabuilder.com>, cole o endereço do sistema e clique em **Start**.
+2. **Package for stores → Android → Generate package**. Em *Signing key* escolha **Create new** e **guarde o arquivo da chave e a senha** (sem eles não dá para atualizar o app depois).
+3. Baixe o `.zip`: o `.apk` assinado está dentro. Envie o `.apk` para os aparelhos (WhatsApp, Drive ou cabo) e instale (o Android pede para permitir "instalar apps desconhecidos").
+4. Para o app abrir **sem a barra do navegador**, publique o arquivo `public/.well-known/assetlinks.json` com o *SHA-256 fingerprint* da chave (vem no zip, em `assetlinks.json`).
+
+O app precisa de internet (o banco fica no Supabase); sem conexão mostra uma tela de aviso. Nada do sistema fica salvo no aparelho.
