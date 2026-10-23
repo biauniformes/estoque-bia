@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { ClipboardList, ListChecks, MinusCircle, Package, PlusCircle, Scissors } from "lucide-react";
+import { ClipboardList, ListChecks, MinusCircle, Package, PlusCircle, Ruler, Scissors } from "lucide-react";
 import { AlertTriangle } from "lucide-react";
 import { requireUser } from "@/lib/auth/session";
 import { createClient } from "@/lib/supabase/server";
@@ -14,6 +14,7 @@ const ACTIONS = [
   { href: "/saida", label: "− SAÍDA", hint: "Uma peça por vez (informe a OC)", icon: MinusCircle, cls: "bg-white hover:bg-slate-100 text-black border-2 border-black" },
   { href: "/estoque", label: "VER ESTOQUE", hint: "Quanto eu tenho?", icon: Package, cls: "bg-white hover:bg-slate-100 text-slate-900 border-2 border-slate-300" },
   { href: "/talhar", label: "PARA TALHAR", hint: "O que mais sai e está com estoque baixo", icon: Scissors, cls: "bg-white hover:bg-slate-100 text-slate-900 border-2 border-slate-300" },
+  { href: "/talhacao", label: "TALHAÇÃO", hint: "Lançar o que foi talhado", icon: Ruler, cls: "bg-black hover:bg-neutral-700 text-white" },
   { href: "/movimentacoes", label: "MOVIMENTAÇÕES", hint: "O que eu já registrei", icon: ClipboardList, cls: "bg-white hover:bg-slate-100 text-slate-900 border-2 border-slate-300" },
 ];
 
@@ -27,7 +28,7 @@ export default async function HomePage() {
     profile.role === "expedicao"
       ? ACTIONS.filter((a) => ["/saida-oc", "/estoque"].includes(a.href))
       : profile.role === "corte"
-        ? ACTIONS.filter((a) => ["/talhar", "/estoque"].includes(a.href))
+        ? ACTIONS.filter((a) => ["/talhacao", "/talhar", "/estoque"].includes(a.href))
         : ACTIONS;
   const { count: baixos } = await supabase.from("stock_overview").select("variant_id", { count: "exact", head: true }).eq("ativo", true).eq("status", "baixo");
 

@@ -91,6 +91,10 @@ export const AUDIT_ACTION_LABELS: Record<string, string> = {
   saida_oc_lote: "Saída por OC (vários itens)",
   importacao_catalogo: "Catálogo importado",
   limpeza_dados_demonstracao: "Dados de demonstração removidos",
+  talhacao_lancada: "Talhação lançada",
+  talhacao_excluida: "Talhação excluída",
+  talhacao_funcionaria_criada: "Funcionária da talhação cadastrada",
+  talhacao_funcionaria_removida: "Funcionária da talhação removida",
 };
 
 export const PAGE_SIZE = 25;

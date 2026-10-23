@@ -15,6 +15,7 @@ import {
   Package,
   PlusCircle,
   MinusCircle,
+  Ruler,
   Scissors,
   Shirt,
   ShieldCheck,
@@ -36,11 +37,13 @@ const NAV: NavItem[] = [
   { href: "/saida", label: "Saída", icon: MinusCircle },
   { href: "/saida-oc", label: "Saída por OC", icon: ListChecks },
   { href: "/talhar", label: "Para talhar", icon: Scissors },
+  { href: "/talhacao", label: "Talhação", icon: Ruler },
   { href: "/movimentacoes", label: "Movimentações", icon: ClipboardList },
   { href: "/produtos", label: "Produtos", icon: Shirt, admin: true },
   { href: "/ocs", label: "OCs", icon: FileText, admin: true },
   { href: "/contagem", label: "Contagem inicial", icon: ClipboardCheck, admin: true },
   { href: "/relatorios", label: "Relatórios", icon: FileSpreadsheet },
+  { href: "/talhacao/historico", label: "Histórico talhação", icon: Ruler, admin: true },
   { href: "/usuarios", label: "Usuários", icon: Users, admin: true },
   { href: "/auditoria", label: "Auditoria", icon: ShieldCheck, admin: true },
 ];
@@ -62,7 +65,7 @@ function NavList({ role, onNavigate }: { role: Role; onNavigate?: () => void }) 
   const pathname = usePathname();
   // Expedição: só Início, Estoque e Saída por OC · Corte: só Início, Estoque e Para talhar
   const EXPEDICAO = ["/", "/estoque", "/saida-oc"];
-  const CORTE = ["/", "/estoque", "/talhar"];
+  const CORTE = ["/", "/estoque", "/talhar", "/talhacao"];
   const items = NAV.filter((i) => !i.admin || role === "admin")
     .filter((i) => !(role === "admin" && i.href === "/"))
     .filter((i) => role !== "expedicao" || EXPEDICAO.includes(i.href))
