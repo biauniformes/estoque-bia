@@ -40,11 +40,12 @@ export function CreateUserDialog() {
             </DialogHeader>
             <div className="space-y-4">
               <Field label="Nome" htmlFor="u-nome" error={e("nome")}><Input id="u-nome" name="nome" required maxLength={120} /></Field>
-              <Field label="Usuário" htmlFor="u-email" error={e("email")} hint="Ex.: estoque, expedicao — ou um e-mail completo."><Input id="u-email" name="email" type="text" required autoComplete="off" autoCapitalize="none" spellCheck={false} /></Field>
+              <Field label="Usuário" htmlFor="u-email" error={e("email")} hint="Ex.: estoque, expedicao, corte — ou um e-mail completo."><Input id="u-email" name="email" type="text" required autoComplete="off" autoCapitalize="none" spellCheck={false} /></Field>
               <Field label="Função" htmlFor="u-role" error={e("role")}>
                 <Select id="u-role" name="role" defaultValue="operator">
                   <option value="operator">{ROLE_LABELS.operator}</option>
                   <option value="expedicao">{ROLE_LABELS.expedicao}</option>
+                  <option value="corte">{ROLE_LABELS.corte}</option>
                   <option value="admin">{ROLE_LABELS.admin}</option>
                 </Select>
               </Field>
@@ -92,6 +93,7 @@ export function RoleSelect({ userId, role, disabled }: { userId: string; role: R
     >
       <option value="operator">{ROLE_LABELS.operator}</option>
       <option value="expedicao">{ROLE_LABELS.expedicao}</option>
+      <option value="corte">{ROLE_LABELS.corte}</option>
       <option value="admin">{ROLE_LABELS.admin}</option>
     </Select>
   );

@@ -28,7 +28,7 @@ const createSchema = z.object({
     .max(120)
     .transform(toLoginEmail)
     .pipe(z.string().email("Usuário inválido (use letras e números, sem espaços).")),
-  role: z.enum(["admin", "operator", "expedicao"], { error: "Selecione a função." }),
+  role: z.enum(["admin", "operator", "expedicao", "corte"], { error: "Selecione a função." }),
   password: passwordSchema,
 });
 
@@ -82,12 +82,12 @@ export async function createUserAction(_prev: FormState, formData: FormData): Pr
 }
 
 /** Altera função e/ou situação (RLS: só admin; trigger registra na auditoria e protege o último admin). */
-export async function updateUserAction(userId: string, changes: { role?: "admin" | "operator" | "expedicao"; ativo?: boolean }): Promise<ActionResult> {
+export async function updateUserAction(userId: string, changes: { role?: "admin" | "operator" | "expedicao" | "corte"; ativo?: boolean }): Promise<ActionResult> {
   const admin = await requireAdmin();
   if (!isUuid(userId)) return { ok: false, error: "Usuário inválido." };
   if (userId === admin.id) return { ok: false, error: "Você não pode alterar a própria função ou situação." };
   const payload: Record<string, unknown> = {};
-  if (changes.role === "admin" || changes.role === "operator" || changes.role === "expedicao") payload.role = changes.role;
+  if (changes.role === "admin" || changes.role === "operator" || changes.role === "expedicao" || changes.role === "corte") payload.role = changes.role;
   if (typeof changes.ativo === "boolean") payload.ativo = changes.ativo;
   if (Object.keys(payload).length === 0) return { ok: false, error: "Nada para alterar." };
 

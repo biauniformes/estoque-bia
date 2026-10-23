@@ -57,8 +57,8 @@ export const REASON_LABELS: Record<string, string> = {
   outros: "Outros",
 };
 
-export type Role = "admin" | "operator" | "expedicao";
-export const ROLE_LABELS: Record<Role, string> = { admin: "Administrador", operator: "Operador de estoque", expedicao: "Expedição" };
+export type Role = "admin" | "operator" | "expedicao" | "corte";
+export const ROLE_LABELS: Record<Role, string> = { admin: "Administrador", operator: "Operador de estoque", expedicao: "Expedição", corte: "Corte (talhador)" };
 
 export const STATUS_LABELS = { normal: "Normal", baixo: "Estoque baixo", zerado: "Zerado" } as const;
 export type StockStatus = keyof typeof STATUS_LABELS;

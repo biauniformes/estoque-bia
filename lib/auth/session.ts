@@ -21,10 +21,17 @@ export async function requireUser(): Promise<Profile> {
   return profile;
 }
 
-/** Perfil Expedição só vê o estoque e faz saída por OC: as demais telas voltam para o início. */
-export async function requireNotExpedicao(): Promise<Profile> {
+/** Expedição e Corte só consultam: as telas de operação (entrada, saída, relatórios…) voltam para o início. */
+export async function requireNotRestricted(): Promise<Profile> {
   const profile = await requireUser();
-  if (profile.role === "expedicao") redirect("/");
+  if (profile.role === "expedicao" || profile.role === "corte") redirect("/");
+  return profile;
+}
+
+/** Corte (talhador) não registra saída de nenhum tipo; Expedição pode usar a saída por OC. */
+export async function requireNotCorte(): Promise<Profile> {
+  const profile = await requireUser();
+  if (profile.role === "corte") redirect("/");
   return profile;
 }
 

@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { AlertTriangle, ArrowDownToLine, ArrowUpFromLine, MinusCircle, Package, PlusCircle } from "lucide-react";
-import { requireNotExpedicao } from "@/lib/auth/session";
+import { requireNotRestricted } from "@/lib/auth/session";
 import { getStockRow, getVariantSummary } from "@/services/stock";
 import { listMovements } from "@/services/movements";
 import { categoryLabel, REASON_LABELS } from "@/lib/constants";
@@ -15,7 +15,7 @@ import { EmptyState } from "@/components/shared/states";
 export const metadata = { title: "Detalhe do item" };
 
 export default async function VariantDetailPage({ params }: { params: Promise<{ variantId: string }> }) {
-  const profile = await requireNotExpedicao();
+  const profile = await requireNotRestricted();
   const { variantId } = await params;
   if (!isUuid(variantId)) notFound();
   const row = await getStockRow(variantId);

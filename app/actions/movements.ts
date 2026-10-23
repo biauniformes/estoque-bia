@@ -34,6 +34,9 @@ export async function registerMovementAction(input: MovementInput): Promise<Acti
   if (profile.role === "expedicao") {
     return { ok: false, error: "O perfil Expedição só pode fazer saída por OC.", code: "SEM_PERMISSAO" };
   }
+  if (profile.role === "corte") {
+    return { ok: false, error: "O perfil Corte só pode consultar o estoque.", code: "SEM_PERMISSAO" };
+  }
   const parsed = movementSchema.safeParse(input);
   if (!parsed.success) {
     const fieldErrors: Record<string, string> = {};
@@ -181,6 +184,9 @@ export async function registerOcExitAction(input: {
   items: { variantId: string; quantidade: number }[];
 }): Promise<ActionResult<OcExitResult>> {
   const profile = await requireUser();
+  if (profile.role === "corte") {
+    return { ok: false, error: "O perfil Corte só pode consultar o estoque.", code: "SEM_PERMISSAO" };
+  }
   const parsed = ocExitSchema.safeParse(input);
   if (!parsed.success) {
     const issue = parsed.error.issues[0];

@@ -1,4 +1,4 @@
-import { requireUser } from "@/lib/auth/session";
+import { requireNotCorte } from "@/lib/auth/session";
 import { listActiveVariants } from "@/services/stock";
 import { PageHeader } from "@/components/shared/page-header";
 import { OcExitForm } from "@/components/estoque/oc-exit-form";
@@ -6,7 +6,7 @@ import { OcExitForm } from "@/components/estoque/oc-exit-form";
 export const metadata = { title: "Saída por OC" };
 
 export default async function SaidaOcPage() {
-  const profile = await requireUser();
+  const profile = await requireNotCorte();
   const variants = await listActiveVariants();
   return (
     <>

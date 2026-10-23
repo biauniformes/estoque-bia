@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { ClipboardList, ListChecks, MinusCircle, Package, PlusCircle } from "lucide-react";
+import { ClipboardList, ListChecks, MinusCircle, Package, PlusCircle, Scissors } from "lucide-react";
 import { AlertTriangle } from "lucide-react";
 import { requireUser } from "@/lib/auth/session";
 import { createClient } from "@/lib/supabase/server";
@@ -13,6 +13,7 @@ const ACTIONS = [
   { href: "/saida-oc", label: "SAÍDA PARA OC", hint: "Vários itens de uma vez para a mesma OC", icon: ListChecks, cls: "bg-black hover:bg-neutral-700 text-white sm:col-span-2" },
   { href: "/saida", label: "− SAÍDA", hint: "Uma peça por vez (informe a OC)", icon: MinusCircle, cls: "bg-white hover:bg-slate-100 text-black border-2 border-black" },
   { href: "/estoque", label: "VER ESTOQUE", hint: "Quanto eu tenho?", icon: Package, cls: "bg-white hover:bg-slate-100 text-slate-900 border-2 border-slate-300" },
+  { href: "/talhar", label: "PARA TALHAR", hint: "O que mais sai e está com estoque baixo", icon: Scissors, cls: "bg-white hover:bg-slate-100 text-slate-900 border-2 border-slate-300" },
   { href: "/movimentacoes", label: "MOVIMENTAÇÕES", hint: "O que eu já registrei", icon: ClipboardList, cls: "bg-white hover:bg-slate-100 text-slate-900 border-2 border-slate-300" },
 ];
 
@@ -22,7 +23,12 @@ export default async function HomePage() {
 
   // itens com quantidade ABAIXO do mínimo (100 nas camisetas PV e calças de brim azul/branca; 50 nos demais)
   const supabase = await createClient();
-  const acoes = profile.role === "expedicao" ? ACTIONS.filter((a) => ["/saida-oc", "/estoque"].includes(a.href)) : ACTIONS;
+  const acoes =
+    profile.role === "expedicao"
+      ? ACTIONS.filter((a) => ["/saida-oc", "/estoque"].includes(a.href))
+      : profile.role === "corte"
+        ? ACTIONS.filter((a) => ["/talhar", "/estoque"].includes(a.href))
+        : ACTIONS;
   const { count: baixos } = await supabase.from("stock_overview").select("variant_id", { count: "exact", head: true }).eq("ativo", true).eq("status", "baixo");
 
   return (

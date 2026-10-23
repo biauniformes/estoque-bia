@@ -552,7 +552,9 @@ async function main() {
     ('700.004','CALÇA JEANS FEM TRADICIONAL ORBENK AZUL 40','calcas',10),
     ('700.005','CALÇA ELÁSTICO COM CORDÃO BRIM 100% ALG SEPAT BRANCA PP','calcas',10),
     ('700.006','BERMUDA BRIM AZUL M','bermudas',10),
-    ('700.007','CAMISETA BÁSICA ML MM PV PROFISER BRANCA GG','camisetas',10)`);
+    ('700.007','CAMISETA BÁSICA ML MM PV PROFISER BRANCA GG','camisetas',10),
+    ('700.008','CALÇA ELÁSTICO COM CORDÃO BRIM ORBENK AZUL 50','calcas',10),
+    ('700.009','CALÇA ELÁSTICO COM CORDÃO BRIM ORBENK AZUL 52','calcas',10)`);
   await db.exec("insert into product_variants (product_id,cor,tamanho,sku) select id,'Único','Único',codigo from products where codigo like '700.%'");
   const mins0 = await rows<{ m: number }>("select distinct estoque_minimo as m from product_variants where sku like '700.%'");
   ok("item novo nasce com mínimo 50 (padrão)", mins0.length === 1 && mins0[0].m === 50, JSON.stringify(mins0));
@@ -561,7 +563,8 @@ async function main() {
   await db.exec(readFileSync(join(root, "supabase", "manutencao", "definir_estoque_minimo.sql"), "utf8"));
   const mins = Object.fromEntries((await rows<{ sku: string; m: number }>("select sku, estoque_minimo as m from product_variants where sku like '700.%'")).map((r) => [r.sku, r.m]));
   ok("camiseta PV MC → 100; camiseta PV ML (PROFISER) → 100", mins["700.001"] === 100 && mins["700.007"] === 100, JSON.stringify(mins));
-  ok("calça BRIM azul e branca → 100", mins["700.003"] === 100 && mins["700.005"] === 100, JSON.stringify(mins));
+  ok("calça BRIM azul e branca → 100 só nos tamanhos P–XG e 36–50 (G e 50)", mins["700.003"] === 100 && mins["700.008"] === 100, JSON.stringify(mins));
+  ok("calça BRIM azul e branca → 50 nos demais tamanhos (PP e 52)", mins["700.005"] === 50 && mins["700.009"] === 50, JSON.stringify(mins));
   ok("camiseta 100% ALG (sem PV), calça jeans e bermuda brim → 50", mins["700.002"] === 50 && mins["700.004"] === 50 && mins["700.006"] === 50, JSON.stringify(mins));
   const auditDepois = (await rows<{ n: number }>("select count(*)::int n from audit_logs where action = 'variacao_alterado'"))[0].n;
   ok("alteração em lote NÃO enche a auditoria (só 1 resumo)", auditDepois === auditAntes && (await rows("select 1 from audit_logs where action = 'estoque_minimo_definido'")).length === 1, `${auditAntes} → ${auditDepois}`);
@@ -618,6 +621,26 @@ async function main() {
   await expectError("expedição NÃO lê o valor na tabela de produtos", () => rows("select valor_unitario from products"), /permission denied/);
   await expectError("expedição NÃO acessa o dashboard de admin", () => rows("select public.dashboard_summary()"), /SEM_PERMISSAO/);
   await expectError("expedição NÃO lê a auditoria", () => rows("select * from audit_logs").then((r) => { if (r.length) throw new Error("vazou"); throw new Error("permission denied (0 linhas)"); }), /permission denied/);
+
+  console.log("\nPerfil Corte (só consulta o estoque)");
+  const COR = "00000000-0000-0000-0000-0000000000c1";
+  await db.exec("reset role");
+  await db.exec(`insert into auth.users (id, email, raw_user_meta_data) values ('${COR}', 'corte@t.dev', '{"nome":"Corte"}')`);
+  await db.exec(`update profiles set role = 'corte' where id = '${COR}'`);
+  const rolC = (await rows<{ role: string }>("select role::text as role from profiles where id = $1", [COR]))[0].role;
+  ok("perfil 'corte' existe no banco", rolC === "corte", rolC);
+  const estC = await stock(VEX);
+  await as(COR);
+  await expectError("corte NÃO registra entrada", () => mov(COR, VEX, "entrada", 5, "producao", null, "key-cor-000001"), /SEM_PERMISSAO/);
+  await as(COR);
+  await expectError("corte NÃO faz saída avulsa", () => mov(COR, VEX, "saida", 1, "oc", "OC 5", "key-cor-000002"), /SEM_PERMISSAO/);
+  await as(COR);
+  await expectError("corte NÃO faz saída por OC", () => rows("select public.register_oc_exit('OC 322', $1::jsonb, 'oc-cor-lote-01', null, null, null, 'oc')", [JSON.stringify([{ variant_id: VEX, quantidade: 1 }])]), /SEM_PERMISSAO/);
+  await as(COR);
+  await expectError("corte NÃO lança contagem inicial", () => lote([{ variant_id: VEX, quantidade: 5 }], "lote-cor-0001"), /SEM_PERMISSAO/);
+  const visC = await rows<Record<string, any>>("select estoque, valor_unitario, valor_total from stock_overview where variant_id = $1", [VEX]);
+  ok("corte VÊ o estoque, sem valores, e o saldo não mudou", visC.length === 1 && visC[0].valor_unitario === null && visC[0].valor_total === null && visC[0].estoque === estC, JSON.stringify(visC));
+  await expectError("corte NÃO lê o valor na tabela de produtos", () => rows("select valor_unitario from products"), /permission denied/);
 
   console.log(`\n${passed} ok, ${failed} falhas`);
   process.exit(failed ? 1 : 0);

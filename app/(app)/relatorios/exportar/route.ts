@@ -37,7 +37,7 @@ function todayBR() {
 export async function GET(request: Request) {
   const profile = await getCurrentProfile();
   if (!profile || !profile.ativo) return new Response("Não autenticado", { status: 401 });
-  if (profile.role === "expedicao") return new Response("Acesso negado", { status: 403 });
+  if (profile.role === "expedicao" || profile.role === "corte") return new Response("Acesso negado", { status: 403 });
   const isAdmin = profile.role === "admin";
 
   const url = new URL(request.url);

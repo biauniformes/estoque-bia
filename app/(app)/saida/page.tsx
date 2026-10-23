@@ -1,6 +1,6 @@
 import { MovementForm } from "@/components/estoque/movement-form";
 import { PageHeader } from "@/components/shared/page-header";
-import { requireNotExpedicao } from "@/lib/auth/session";
+import { requireNotRestricted } from "@/lib/auth/session";
 import { listActiveVariants } from "@/services/stock";
 import Link from "next/link";
 import { first } from "@/lib/utils";
@@ -8,7 +8,7 @@ import { first } from "@/lib/utils";
 export const metadata = { title: "Saída de estoque" };
 
 export default async function SaidaPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
-  const profile = await requireNotExpedicao();
+  const profile = await requireNotRestricted();
   const sp = await searchParams;
   const variants = await listActiveVariants();
   return (

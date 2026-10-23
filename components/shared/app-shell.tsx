@@ -15,6 +15,7 @@ import {
   Package,
   PlusCircle,
   MinusCircle,
+  Scissors,
   Shirt,
   ShieldCheck,
   Users,
@@ -34,6 +35,7 @@ const NAV: NavItem[] = [
   { href: "/entrada", label: "Entrada", icon: PlusCircle },
   { href: "/saida", label: "Saída", icon: MinusCircle },
   { href: "/saida-oc", label: "Saída por OC", icon: ListChecks },
+  { href: "/talhar", label: "Para talhar", icon: Scissors },
   { href: "/movimentacoes", label: "Movimentações", icon: ClipboardList },
   { href: "/produtos", label: "Produtos", icon: Shirt, admin: true },
   { href: "/ocs", label: "OCs", icon: FileText, admin: true },
@@ -58,11 +60,14 @@ function Brand() {
 
 function NavList({ role, onNavigate }: { role: Role; onNavigate?: () => void }) {
   const pathname = usePathname();
-  // Expedição: só Início, Estoque e Saída por OC
+  // Expedição: só Início, Estoque e Saída por OC · Corte: só Início, Estoque e Para talhar
   const EXPEDICAO = ["/", "/estoque", "/saida-oc"];
+  const CORTE = ["/", "/estoque", "/talhar"];
   const items = NAV.filter((i) => !i.admin || role === "admin")
     .filter((i) => !(role === "admin" && i.href === "/"))
-    .filter((i) => role !== "expedicao" || EXPEDICAO.includes(i.href));
+    .filter((i) => role !== "expedicao" || EXPEDICAO.includes(i.href))
+    .filter((i) => role !== "corte" || CORTE.includes(i.href))
+    .filter((i) => i.href !== "/talhar" || role !== "expedicao");
   return (
     <nav aria-label="Menu principal" className="flex flex-col gap-1.5">
       {items.map((item) => {

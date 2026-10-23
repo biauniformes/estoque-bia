@@ -20,7 +20,7 @@ export const metadata = { title: "Estoque atual" };
 export default async function EstoquePage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const profile = await requireUser();
   const isAdmin = profile.role === "admin";
-  const isExpedicao = profile.role === "expedicao"; // só consulta: sem link de detalhe e sem botões de entrada/saída
+  const isExpedicao = profile.role === "expedicao" || profile.role === "corte"; // só consulta: sem link de detalhe e sem botões de entrada/saída
   const sp = await searchParams;
   const params = {
     q: first(sp.q),
