@@ -29,8 +29,8 @@ export default async function ConsolidacaoPage() {
           ) : undefined
         }
       />
-      <div className="mx-auto max-w-5xl space-y-6">
-        {canWrite && <ImportCard />}
+      <div className="mx-auto max-w-5xl space-y-4">
+        {canWrite && <ImportCard aberto={ordens.length === 0} />}
         <ConsolidacaoView ordens={ordens} canWrite={canWrite} />
       </div>
     </>
