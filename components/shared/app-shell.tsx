@@ -15,6 +15,7 @@ import {
   Package,
   PlusCircle,
   MinusCircle,
+  Layers,
   Ruler,
   Scissors,
   Shirt,
@@ -36,6 +37,7 @@ const NAV: NavItem[] = [
   { href: "/entrada", label: "Entrada", icon: PlusCircle },
   { href: "/saida", label: "Saída", icon: MinusCircle },
   { href: "/saida-oc", label: "Saída por OC", icon: ListChecks },
+  { href: "/consolidacao", label: "Consolidação de OC", icon: Layers },
   { href: "/talhar", label: "Para talhar", icon: Scissors },
   { href: "/talhacao", label: "Talhação", icon: Ruler },
   { href: "/movimentacoes", label: "Movimentações", icon: ClipboardList },
@@ -64,7 +66,7 @@ function Brand() {
 function NavList({ role, onNavigate }: { role: Role; onNavigate?: () => void }) {
   const pathname = usePathname();
   // Expedição: só Início, Estoque e Saída por OC · Corte: só Início, Estoque e Para talhar
-  const EXPEDICAO = ["/", "/estoque", "/saida-oc"];
+  const EXPEDICAO = ["/", "/estoque", "/saida-oc", "/consolidacao"];
   const CORTE = ["/", "/estoque", "/talhar", "/talhacao"];
   const items = NAV.filter((i) => !i.admin || role === "admin")
     .filter((i) => !(role === "admin" && i.href === "/"))

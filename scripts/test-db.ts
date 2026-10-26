@@ -688,6 +688,37 @@ async function main() {
   await as(COR);
   await expectError("funcionária removida não recebe lançamento", () => rows("select public.register_talhacao($1, $2::date, 'PEÇA X', $3::jsonb, null, 'talh-lote-0006')", [adri.id, hoje, itensT]), /FUNCIONARIA_INVALIDA/);
 
+  console.log("\nConsolidação de OC do cliente");
+  await as(OP1);
+  const ocId = (await rows<{ id: string }>("insert into oc_ordens (empresa, numero, entrega) values ('ORBENK ADMINISTRAÇÃO E SERVIÇOS LTDA', '4.938', '2026-10-02') returning id"))[0].id;
+  await as(OP1);
+  await rows("insert into oc_itens (ordem_id, seq, cod_cliente, tamanho, descricao, quantidade) values ($1, 1, '66.0042', 'M', 'Jaqueta Operacional Unissex - Azul', 4)", [ocId]);
+  await as(OP1);
+  await rows("insert into oc_modelo_map (cod_cliente, descricao, modelo, confirmado) values ('66.0042', 'Jaqueta', '600.002', true)");
+  ok("operador cadastra OC, itens e ligação", (await rows("select 1 from oc_itens")).length === 1);
+  await as(OP1);
+  await expectError("modelo fora do padrão NNN.NNN é recusado", () => rows("insert into oc_modelo_map (cod_cliente, modelo) values ('66.9999', 'abc')"), /check|violates/i);
+  await as(OP1);
+  await expectError("mesma OC (empresa + número) não duplica", () => rows("insert into oc_ordens (empresa, numero) values ('ORBENK ADMINISTRAÇÃO E SERVIÇOS LTDA', '4.938')"), /duplicate|unique/i);
+  await as(EXP);
+  ok("expedição VÊ a consolidação (OCs e itens)", (await rows("select 1 from oc_ordens")).length === 1 && (await rows("select 1 from oc_itens")).length === 1);
+  await as(EXP);
+  await expectError("expedição NÃO importa OC", () => rows("insert into oc_ordens (empresa, numero) values ('X', '1')"), /row-level security|permission denied/i);
+  await as(EXP);
+  const updOc = await rows("update oc_ordens set status = 'separada' returning id");
+  ok("expedição NÃO altera OC (nenhuma linha atingida)", updOc.length === 0);
+  await as(COR);
+  ok("corte NÃO enxerga a consolidação", (await rows("select 1 from oc_ordens")).length === 0 && (await rows("select 1 from oc_modelo_map")).length === 0);
+  await as(EXP);
+  await expectError("expedição NÃO grava auditoria da consolidação", () => rows("select public.oc_log_audit('oc_importada', '{}'::jsonb)"), /SEM_PERMISSAO/);
+  await as(OP1);
+  await rows("select public.oc_log_audit('oc_importada', '{\"numero\":\"4.938\"}'::jsonb)");
+  await as(OP1);
+  await expectError("ação de auditoria fora da lista é recusada", () => rows("select public.oc_log_audit('qualquer_coisa', '{}'::jsonb)"), /ACAO_INVALIDA/);
+  await as(OP1);
+  await rows("delete from oc_ordens where id = $1", [ocId]);
+  ok("apagar a OC apaga os itens junto", (await rows("select 1 from oc_itens")).length === 0);
+
   console.log(`\n${passed} ok, ${failed} falhas`);
   process.exit(failed ? 1 : 0);
 }
