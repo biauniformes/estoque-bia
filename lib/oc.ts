@@ -51,3 +51,11 @@ export function resolverItem(mapa: MapaOc, catalogo: CatalogoOc, codCliente: str
   if (!p) return { status: "sem_produto", codigo };
   return { status: m.confirmado ? "ok" : "nao_confirmado", codigo, produto: p.produto, estoque: p.estoque };
 }
+
+/** Avisos que aparecem na lista de separar (e na impressão), por modelo nosso. */
+export const OBSERVACAO_POR_MODELO: Record<string, string> = {
+  "630.002": "Jaqueta sem capuz, com bolso",
+  "630.003": "Jaqueta sem capuz, com bolso",
+  "680.002": "Jaqueta com capuz e bolso",
+  "680.003": "Jaqueta com capuz e bolso",
+};

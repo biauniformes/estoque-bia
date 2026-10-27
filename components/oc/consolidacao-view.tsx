@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { excluirOrdemAction, marcarOrdensAction } from "@/app/actions/oc";
+import { OBSERVACAO_POR_MODELO } from "@/lib/oc";
 import { SECOES, secaoDe } from "@/lib/secoes";
 import { cn, formatNumber } from "@/lib/utils";
 import type { OcOrdemView } from "@/services/oc";
@@ -307,6 +308,9 @@ export function ConsolidacaoView({ ordens, canWrite }: { ordens: OcOrdemView[]; 
                             </td>
                             <td className="py-2 pr-2">
                               <span className="font-semibold">{l.produto}</span>
+                              {OBSERVACAO_POR_MODELO[l.codigo.slice(0, 7)] && (
+                                <span className="block text-sm font-bold text-sky-800">Obs.: {OBSERVACAO_POR_MODELO[l.codigo.slice(0, 7)]}</span>
+                              )}
                               <span className="block font-mono text-xs text-slate-500">
                                 {l.codigo}
                                 {l.incerto && <span className="ml-2 rounded bg-amber-100 px-1.5 py-0.5 font-sans font-bold text-amber-800">ligação a confirmar</span>}
