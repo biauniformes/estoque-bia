@@ -51,7 +51,7 @@ export default async function ProductDetailPage({
       </Link>
       <PageHeader
         title={p.nome}
-        description={`Código ${p.codigo}`}
+        description={p.descricao ? `Código ${p.codigo} · Obs.: ${p.descricao}` : `Código ${p.codigo}`}
         actions={
           <>
             {p.ativo ? <Badge tone="success">Ativo</Badge> : <Badge tone="neutral">Desativado</Badge>}

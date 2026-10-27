@@ -70,7 +70,10 @@ export default async function ProdutosPage({ searchParams }: { searchParams: Pro
             {
               header: "Produto",
               cell: (r) => (
-                <Link href={`/produtos/${r.id}`} className="font-bold hover:text-orange-700 hover:underline">{r.nome}</Link>
+                <div>
+                  <Link href={`/produtos/${r.id}`} className="font-bold hover:text-orange-700 hover:underline">{r.nome}</Link>
+                  {r.descricao && <span className="block text-sm font-semibold text-sky-800">Obs.: {r.descricao}</span>}
+                </div>
               ),
             },
             { header: "Categoria", hideBelow: "md", cell: (r) => categoryLabel(r.categoria) },
