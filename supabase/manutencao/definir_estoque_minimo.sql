@@ -4,6 +4,7 @@
 --   mínimo 100: camisetas PV (manga curta e longa) e calças de BRIM azuis ou brancas,
 --               estas SOMENTE nos tamanhos P ao XG e 36 ao 50 (tamanho = última palavra do nome)
 --   mínimo  50: todos os outros itens (inclusive calça BRIM em PP, G1+ e 34, 52 em diante)
+--               e QUALQUER item nos tamanhos grandes G2, G3, G4, G5… (sempre 50)
 --
 -- Pode rodar de novo quando quiser (recalcula). Para mudar o mínimo de UM item,
 -- use Produtos → variação → Editar (essa edição manual vale até rodar este script de novo).
@@ -36,7 +37,7 @@ alter table public.product_variants enable trigger trg_audit_variants;
 insert into public.audit_logs (action, entity_type, metadata)
 values ('estoque_minimo_definido', 'system',
         jsonb_build_object(
-          'regra', 'camiseta PV MC/ML = 100; calça BRIM azul/branca = 100 só nos tamanhos P-XG e 36-50; demais = 50',
+          'regra', 'camiseta PV MC/ML = 100; calça BRIM azul/branca = 100 só nos tamanhos P-XG e 36-50; demais = 50; tamanhos G2 em diante = sempre 50',
           'itens_100', (select count(*) from public.product_variants where estoque_minimo = 100),
           'itens_50',  (select count(*) from public.product_variants where estoque_minimo = 50)));
 
