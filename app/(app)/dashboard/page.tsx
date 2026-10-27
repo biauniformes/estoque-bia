@@ -46,29 +46,28 @@ export default async function DashboardPage() {
       />
 
       {((s.revisar_valor ?? []).length > 0 || (s.aguardando_valor ?? 0) > 0) && (
-        <div role="alert" className="mb-6 rounded-2xl border-2 border-amber-400 bg-amber-50 p-5 text-amber-900">
-          <p className="flex items-center gap-2 text-lg font-extrabold">
-            <AlertTriangle className="h-6 w-6 shrink-0" aria-hidden /> Valores para revisar
-          </p>
-          {(s.revisar_valor ?? []).length > 0 && (
-            <>
-              <p className="mt-1">Estes itens estão em uso com um valor <strong>provisório</strong>. É preciso rever o valor:</p>
-              <ul className="mt-2 space-y-1">
-                {(s.revisar_valor ?? []).map((r) => (
-                  <li key={r.id}>
-                    <Link href="/produtos/valores?tipo=revisar" className="font-semibold underline underline-offset-4">{r.codigo} — {r.nome}</Link>{" "}
-                    <span className="text-sm">({formatNumber(r.estoque)} un.)</span>
-                  </li>
-                ))}
-              </ul>
-            </>
-          )}
-          {(s.aguardando_valor ?? 0) > 0 && (
-            <p className="mt-2">
-              <Link href="/produtos/valores" className="font-bold underline underline-offset-4">{formatNumber(s.aguardando_valor)} itens novos aguardando valor</Link>{" "}
-              (desativados até você informar o preço).
+        <div role="alert" className="mb-6 flex flex-wrap items-center justify-between gap-3 rounded-2xl border-2 border-amber-400 bg-amber-50 p-4 text-amber-900">
+          <div className="min-w-0">
+            <p className="flex items-center gap-2 text-lg font-extrabold">
+              <AlertTriangle className="h-6 w-6 shrink-0" aria-hidden /> Há valores para revisar
             </p>
-          )}
+            <p className="mt-0.5 text-sm">
+              {(s.revisar_valor ?? []).length > 0 && (
+                <>
+                  <strong>{formatNumber((s.revisar_valor ?? []).length)}</strong> {(s.revisar_valor ?? []).length === 1 ? "item com valor provisório" : "itens com valor provisório"}
+                </>
+              )}
+              {(s.revisar_valor ?? []).length > 0 && (s.aguardando_valor ?? 0) > 0 && " · "}
+              {(s.aguardando_valor ?? 0) > 0 && (
+                <>
+                  <strong>{formatNumber(s.aguardando_valor)}</strong> {s.aguardando_valor === 1 ? "item novo aguardando valor" : "itens novos aguardando valor"}
+                </>
+              )}
+            </p>
+          </div>
+          <Button asChild size="lg">
+            <Link href={(s.revisar_valor ?? []).length > 0 ? "/produtos/valores?tipo=revisar" : "/produtos/valores"}>Revisar valores</Link>
+          </Button>
         </div>
       )}
 
