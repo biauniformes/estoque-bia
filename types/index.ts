@@ -11,6 +11,8 @@ export type Profile = {
 };
 
 export type StockRow = {
+  /** descrição do produto; preenchida só em listStock */
+  observacao?: string | null;
   variant_id: string;
   product_id: string;
   codigo: string;

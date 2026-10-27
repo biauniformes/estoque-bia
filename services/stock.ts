@@ -24,7 +24,15 @@ export async function listStock(f: StockFilters, pageSize = PAGE_SIZE) {
   const from = (page - 1) * pageSize;
   const { data, count, error } = await query.range(from, from + pageSize - 1);
   if (error) throw new Error(error.message);
-  return { rows: (data ?? []) as StockRow[], total: count ?? 0 };
+  const rows = (data ?? []) as StockRow[];
+  // a observação (descrição do produto) não está na view: busca só dos produtos desta página
+  const ids = [...new Set(rows.map((r) => r.product_id))];
+  if (ids.length > 0) {
+    const { data: prods } = await supabase.from("products").select("id, descricao").in("id", ids).not("descricao", "is", null);
+    const obs = new Map((prods ?? []).map((p) => [p.id, p.descricao as string]));
+    for (const r of rows) r.observacao = obs.get(r.product_id) ?? null;
+  }
+  return { rows, total: count ?? 0 };
 }
 
 /**

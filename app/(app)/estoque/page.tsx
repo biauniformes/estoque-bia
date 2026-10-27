@@ -64,6 +64,7 @@ export default async function EstoquePage({ searchParams }: { searchParams: Prom
           <>
             {r.produto}
             {variantLabel(r.cor, r.tamanho) && <span className="block text-sm font-normal text-slate-500">{variantLabel(r.cor, r.tamanho)}</span>}
+            {r.observacao && <span className="block text-sm font-semibold text-sky-800">Obs.: {r.observacao}</span>}
           </>
         );
         return isExpedicao ? (
