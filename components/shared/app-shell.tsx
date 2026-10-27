@@ -76,7 +76,9 @@ function NavList({ role, onNavigate }: { role: Role; onNavigate?: () => void }) 
   return (
     <nav aria-label="Menu principal" className="flex flex-col gap-1.5">
       {items.map((item) => {
-        const active = item.href === "/" ? pathname === "/" : pathname === item.href || pathname.startsWith(item.href + "/");
+        const bate = (h: string) => (h === "/" ? pathname === "/" : pathname === h || pathname.startsWith(h + "/"));
+        // só o item mais específico fica marcado (ex.: /talhacao/historico não marca também /talhacao)
+        const active = bate(item.href) && !items.some((o) => o.href.length > item.href.length && bate(o.href));
         const Icon = item.icon;
         return (
           <Link
