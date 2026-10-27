@@ -59,6 +59,10 @@ export async function listActiveVariants() {
     out.push(...((data ?? []) as StockRow[]));
     if (!data || data.length < 1000) break;
   }
+  // observação (descrição do produto): só poucos produtos têm, então uma leitura única basta
+  const { data: prods } = await supabase.from("products").select("id, descricao").not("descricao", "is", null).neq("descricao", "").limit(1000);
+  const obs = new Map((prods ?? []).map((p) => [p.id, p.descricao as string]));
+  for (const v of out) v.observacao = obs.get(v.product_id) ?? null;
   return out;
 }
 

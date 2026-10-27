@@ -194,6 +194,7 @@ function CountTableInner({ variants }: { variants: StockRow[] }) {
                     <td className="px-4 py-2.5">
                       <span className="font-semibold">{v.produto}</span>
                       {variantLabel(v.cor, v.tamanho) && <span className="ml-2 text-sm text-slate-500">{variantLabel(v.cor, v.tamanho)}</span>}
+                      {v.observacao && <span className="block text-sm font-semibold text-sky-800">Obs.: {v.observacao}</span>}
                       <span className="block font-mono text-xs text-slate-400 md:hidden">{v.codigo}</span>
                     </td>
                     <td className="hidden px-4 py-2.5 text-right tabular-nums lg:table-cell">{formatBRL(v.valor_unitario)}</td>
