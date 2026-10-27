@@ -18,6 +18,7 @@ alter table public.product_variants disable trigger trg_audit_variants;
 with regra as (
   select v.id as variant_id,
          case
+           when upper(substring(btrim(p.nome) from '(\S+)$')) ~ '^G([2-9]|[0-9]{2,})$' then 50
            when (b ~ 'camiseta' and b ~ '\mpv\M' and b ~ '\m(mc|ml)\M')
              or (b ~ 'calca' and b ~ '\mbrim\M' and b ~ '\m(azul|branca|branco)\M'
                  and upper(substring(btrim(p.nome) from '(\S+)$')) in ('P','M','G','GG','XG','36','38','40','42','44','46','48','50'))
