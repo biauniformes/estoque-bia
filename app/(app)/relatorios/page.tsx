@@ -124,7 +124,7 @@ async function RelatoriosAdmin({ sp }: { sp: Record<string, string | string[] | 
                     </a>
                   </Button>
                   <Button asChild size="sm" variant="outline">
-                    <a href={`/relatorios?empresa=${e.empresa}${versao === "operador" ? "&versao=operador" : ""}`}>Ver na tela</a>
+                    <a href={`/relatorios?empresa=${e.empresa}${versao === "operador" ? "&versao=operador" : ""}#estoque-empresa`}>Ver na tela</a>
                   </Button>
                 </div>
               </div>
@@ -132,6 +132,42 @@ async function RelatoriosAdmin({ sp }: { sp: Record<string, string | string[] | 
           </div>
         </CardContent>
       </Card>
+
+      {marca && (
+        <Card id="estoque-empresa" className="mb-6 scroll-mt-4 overflow-hidden">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Boxes className="h-5 w-5 text-brand" aria-hidden /> Estoque — {empresaLabel(marca)}
+            </CardTitle>
+            <CardDescription>
+              {formatNumber(comEstoque)} {comEstoque === 1 ? "item" : "itens"} com estoque · {formatNumber(pecas)} peças · {formatBRL(valor)}
+              {comEstoque > MAX_ROWS_ON_SCREEN && <> · mostrando os {MAX_ROWS_ON_SCREEN} primeiros (o Excel traz todos)</>}
+            </CardDescription>
+          </CardHeader>
+          <DataTable<StockRow>
+            caption={`Estoque de ${empresaLabel(marca)}`}
+            rows={rows.filter((r) => r.estoque > 0).slice(0, MAX_ROWS_ON_SCREEN)}
+            rowKey={(r) => r.variant_id}
+            empty={<p className="px-5 pb-8 text-center text-slate-500">Nenhum item com estoque nesta empresa.</p>}
+            columns={[
+              { header: "Código", hideBelow: "md", cell: (r) => <span className="font-mono text-sm">{r.codigo}</span> },
+              {
+                header: "Produto",
+                cell: (r) => (
+                  <>
+                    <strong>{r.produto}</strong>
+                    {variantLabel(r.cor, r.tamanho) && <span className="ml-2 text-slate-500">{variantLabel(r.cor, r.tamanho)}</span>}
+                  </>
+                ),
+              },
+              { header: "Estoque", align: "right", cell: (r) => <strong className="text-xl">{formatNumber(r.estoque)}</strong> },
+              { header: "Valor unit.", align: "right", hideBelow: "lg", cell: (r) => formatBRL(r.valor_unitario) },
+              { header: "Valor total", align: "right", hideBelow: "md", cell: (r) => <strong>{formatBRL(r.valor_total)}</strong> },
+              { header: "Situação", cell: (r) => <StockBadge status={r.status} /> },
+            ]}
+          />
+        </Card>
+      )}
 
       <div className="grid gap-4 md:grid-cols-3">
         <StatCard label="Itens cadastrados" value={formatNumber(rows.length)} icon={<FileSpreadsheet className="h-7 w-7" />} hint={`${formatNumber(comEstoque)} com estoque`} />
