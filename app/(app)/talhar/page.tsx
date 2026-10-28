@@ -5,6 +5,7 @@ import { listActiveVariants } from "@/services/stock";
 import { GRUPOS_TALHAR, grupoTalharDe } from "@/lib/talhar";
 import { cn, first, formatNumber, variantLabel } from "@/lib/utils";
 import { PageHeader } from "@/components/shared/page-header";
+import { AbasTalhacao } from "@/components/talhacao/abas";
 import { Card } from "@/components/ui/card";
 import { DataTable, type Column } from "@/components/shared/data-table";
 import { StockBadge } from "@/components/shared/badges";
@@ -69,6 +70,7 @@ export default async function TalharPage({ searchParams }: { searchParams: Promi
 
   return (
     <>
+      {profile.role === "admin" && <AbasTalhacao ativa="/talhar" />}
       <PageHeader
         title="Para talhar"
         description="Peças que mais saem e estão abaixo do estoque mínimo. A coluna “Talhar” é o quanto falta para chegar ao mínimo."

@@ -28,7 +28,7 @@ import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 import { ROLE_LABELS, type Role } from "@/lib/constants";
 
-type NavItem = { href: string; label: string; icon: LucideIcon; admin?: boolean; accent?: "entrada" | "saida" };
+type NavItem = { href: string; label: string; icon: LucideIcon; admin?: boolean; accent?: "entrada" | "saida"; tambem?: string[] };
 
 const NAV: NavItem[] = [
   { href: "/", label: "Início", icon: Home },
@@ -72,13 +72,16 @@ function NavList({ role, onNavigate }: { role: Role; onNavigate?: () => void }) 
     .filter((i) => !(role === "admin" && i.href === "/"))
     .filter((i) => role !== "expedicao" || EXPEDICAO.includes(i.href))
     .filter((i) => role !== "corte" || CORTE.includes(i.href))
-    .filter((i) => i.href !== "/talhar" || role !== "expedicao");
+    .filter((i) => i.href !== "/talhar" || role !== "expedicao")
+    // admin/operador: um botão só (Talhação) com as abas Para talhar e Histórico; o lançamento fica para o perfil Corte
+    .filter((i) => role === "corte" ? true : i.href !== "/talhacao" && i.href !== "/talhacao/historico")
+    .map((i): NavItem => (i.href === "/talhar" && role !== "corte" ? { ...i, label: "Talhação", tambem: ["/talhacao/historico"] } : i));
   return (
     <nav aria-label="Menu principal" className="flex flex-col gap-1.5">
       {items.map((item) => {
         const bate = (h: string) => (h === "/" ? pathname === "/" : pathname === h || pathname.startsWith(h + "/"));
         // só o item mais específico fica marcado (ex.: /talhacao/historico não marca também /talhacao)
-        const active = bate(item.href) && !items.some((o) => o.href.length > item.href.length && bate(o.href));
+        const active = (bate(item.href) || !!item.tambem?.some(bate)) && !items.some((o) => o.href.length > item.href.length && bate(o.href));
         const Icon = item.icon;
         return (
           <Link

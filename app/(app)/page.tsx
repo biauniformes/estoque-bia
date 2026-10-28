@@ -30,7 +30,7 @@ export default async function HomePage() {
       ? ACTIONS.filter((a) => ["/saida-oc", "/consolidacao", "/estoque"].includes(a.href))
       : profile.role === "corte"
         ? ACTIONS.filter((a) => ["/talhacao", "/talhar", "/estoque"].includes(a.href))
-        : ACTIONS;
+        : ACTIONS.filter((a) => a.href !== "/talhacao");
   const { count: baixos } = await supabase.from("stock_overview").select("variant_id", { count: "exact", head: true }).eq("ativo", true).eq("status", "baixo");
 
   return (

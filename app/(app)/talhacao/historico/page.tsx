@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { ordemTamanho } from "@/lib/talhacao";
 import { first, formatNumber, isDate, isUuid } from "@/lib/utils";
 import { PageHeader } from "@/components/shared/page-header";
+import { AbasTalhacao } from "@/components/talhacao/abas";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Field, Input, Select } from "@/components/ui/input";
@@ -73,6 +74,7 @@ export default async function HistoricoTalhacaoPage({ searchParams }: { searchPa
 
   return (
     <>
+      <AbasTalhacao ativa="/talhacao/historico" />
       <PageHeader title="Histórico da talhação" description="O que foi talhado no período, por funcionária e por peça." />
 
       <Card className="mb-6 p-5">
