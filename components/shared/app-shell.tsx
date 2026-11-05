@@ -22,6 +22,7 @@ import {
   ShieldCheck,
   Users,
   Home,
+  Scale,
   type LucideIcon,
 } from "lucide-react";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
@@ -43,6 +44,7 @@ const NAV: NavItem[] = [
   { href: "/movimentacoes", label: "Movimentações", icon: ClipboardList },
   { href: "/produtos", label: "Produtos", icon: Shirt, admin: true },
   { href: "/ocs", label: "OCs", icon: FileText, admin: true },
+  { href: "/exequibilidade", label: "Exequibilidade", icon: Scale, admin: true },
   { href: "/contagem", label: "Contagem inicial", icon: ClipboardCheck, admin: true },
   { href: "/relatorios", label: "Relatórios", icon: FileSpreadsheet },
   { href: "/talhacao/historico", label: "Histórico talhação", icon: Ruler, admin: true },
