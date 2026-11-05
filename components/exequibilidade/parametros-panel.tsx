@@ -16,7 +16,7 @@ const OPCOES_TIPO = (Object.keys(NOMES_TIPO) as TipoLicitacao[]).map((value) => 
 
 const OPCOES_CRITERIO: { value: CriterioInexequibilidade; label: string }[] = [
   { value: "percentual", label: "Percentual do orçamento (art. 59, §4º / edital)" },
-  { value: "estatistico", label: "Estatístico (média das propostas, ref. Lei 8.666)" },
+  { value: "estatistico", label: "Estatístico (Lei 8.666 — só referência histórica; não vale na 14.133)" },
   { value: "mais_rigoroso", label: "O mais rigoroso entre os dois" },
 ];
 
@@ -56,7 +56,7 @@ export function ParametrosPanel({ ctx }: { ctx: UseAnalise }) {
             dica={
               p.tipo === "obras"
                 ? "Lei 14.133/2021, art. 59, §4º: 75% para obras e serviços de engenharia."
-                : "A lei não fixa percentual para este objeto: use o previsto no edital."
+                : "Bens e serviços em geral: abaixo de 50% é indício de inexequibilidade (IN SEGES/ME 73/2022, art. 34, Executivo federal). Estados e municípios: use o do edital. Só vale após diligência."
             }
           >
             <NumberField id="limite" suffix="%" value={p.percentualInexequibilidade} onChange={(v) => setP({ percentualInexequibilidade: v })} />

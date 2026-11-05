@@ -8,91 +8,76 @@ import {
   PERCENTUAL_PADRAO,
   TRIBUTOS_PADRAO,
   analiseVazia,
-  defesaPadrao,
-  encargosPadrao,
   exemplo,
 } from "@/lib/exequibilidade/defaults";
+import { normalizar } from "@/lib/exequibilidade/normalizar";
 
-const CHAVE = "exequibilidade:analise:v1";
+export { normalizar };
 
-/** Mescla dados salvos/importados com os padrões, tolerando versões antigas. */
-export function normalizar(bruto: unknown): Analise | null {
-  if (!bruto || typeof bruto !== "object") return null;
-  const b = bruto as Partial<Analise>;
-  if (!b.parametros || !Array.isArray(b.insumos)) return null;
-  const base = analiseVazia(b.parametros.tipo ?? "obras");
-  return {
-    ...base,
-    ...b,
-    versao: 1,
-    identificacao: { ...base.identificacao, ...b.identificacao },
-    parametros: { ...base.parametros, ...b.parametros },
-    encargos: {
-      ...base.encargos,
-      ...b.encargos,
-      itens: b.encargos?.itens?.length ? b.encargos.itens : encargosPadrao().itens,
-    },
-    bdi: { ...base.bdi, ...b.bdi },
-    tributos: { ...base.tributos, ...b.tributos },
-    concorrentes: Array.isArray(b.concorrentes) ? b.concorrentes : [],
-    defesa: { ...defesaPadrao(), ...b.defesa },
-  };
-}
+export type EstadoSalvamento = "salvo" | "pendente" | "salvando" | "erro";
 
-export function useAnalise() {
-  const [analise, setAnalise] = useState<Analise>(() => analiseVazia());
-  const [carregado, setCarregado] = useState(false);
+/**
+ * Estado da análise de UMA licitação. O salvamento é automático (com debounce) pelo
+ * callback `aoSalvar`, que grava no banco; devolve mensagem de erro ou null.
+ */
+export function useAnalise(inicial: Analise, aoSalvar: (a: Analise) => Promise<string | null>) {
+  const [analise, setAnalise] = useState<Analise>(inicial);
+  const [estado, setEstado] = useState<EstadoSalvamento>("salvo");
+  const [erro, setErro] = useState<string | null>(null);
   const [salvoEm, setSalvoEm] = useState<Date | null>(null);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const primeira = useRef(true);
+  const salvarRef = useRef(aoSalvar);
+  const ultima = useRef(analise);
 
-  // Carrega do localStorage após a hidratação (evita divergência SSR/cliente).
-  /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
-    try {
-      const txt = localStorage.getItem(CHAVE);
-      if (txt) {
-        const n = normalizar(JSON.parse(txt));
-        if (n) setAnalise(n);
-      }
-    } catch {
-      /* armazenamento indisponível: segue com padrão */
+    salvarRef.current = aoSalvar;
+  });
+
+  const gravar = useCallback(async () => {
+    setEstado("salvando");
+    const msg = await salvarRef.current(ultima.current);
+    if (msg) {
+      setErro(msg);
+      setEstado("erro");
+    } else {
+      setErro(null);
+      setSalvoEm(new Date());
+      setEstado("salvo");
     }
-    setCarregado(true);
   }, []);
-  /* eslint-enable react-hooks/set-state-in-effect */
 
-  // Autosave com debounce.
+  // Autosave com debounce (não grava na montagem).
   useEffect(() => {
-    if (!carregado) return;
+    ultima.current = analise;
+    if (primeira.current) {
+      primeira.current = false;
+      return;
+    }
+    setEstado("pendente");
     if (timer.current) clearTimeout(timer.current);
-    timer.current = setTimeout(() => {
-      try {
-        localStorage.setItem(CHAVE, JSON.stringify(analise));
-        setSalvoEm(new Date());
-      } catch {
-        /* ignore */
-      }
-    }, 400);
+    timer.current = setTimeout(gravar, 900);
     return () => {
       if (timer.current) clearTimeout(timer.current);
     };
-  }, [analise, carregado]);
+  }, [analise, gravar]);
+
+  // Avisa se tentar sair com alteração ainda não gravada.
+  useEffect(() => {
+    if (estado === "salvo") return;
+    const f = (e: BeforeUnloadEvent) => e.preventDefault();
+    window.addEventListener("beforeunload", f);
+    return () => window.removeEventListener("beforeunload", f);
+  }, [estado]);
 
   const resultado = useMemo(() => analisar(analise), [analise]);
 
-  const atualizar = useCallback(
-    (fn: (a: Analise) => Analise) => setAnalise((a) => fn(a)),
-    [],
-  );
+  const atualizar = useCallback((fn: (a: Analise) => Analise) => setAnalise((a) => fn(a)), []);
 
   const trocarTipo = useCallback((tipo: TipoLicitacao) => {
     setAnalise((a) => ({
       ...a,
-      parametros: {
-        ...a.parametros,
-        tipo,
-        percentualInexequibilidade: PERCENTUAL_PADRAO[tipo],
-      },
+      parametros: { ...a.parametros, tipo, percentualInexequibilidade: PERCENTUAL_PADRAO[tipo] },
       bdi: { ...BDI_PADRAO[tipo] },
       tributos: { ...TRIBUTOS_PADRAO[tipo] },
     }));
@@ -120,7 +105,9 @@ export function useAnalise() {
     carregarExemplo,
     importar,
     salvoEm,
-    carregado,
+    estado,
+    erro,
+    salvarAgora: gravar,
   };
 }
 

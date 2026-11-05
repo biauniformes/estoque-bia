@@ -21,6 +21,7 @@ import { FICHA_VAZIA, insumosDaFicha, type FichaPeca } from "@/lib/exequibilidad
 import { useState } from "react";
 import { formatBRL, formatPct } from "@/lib/exequibilidade/format";
 import { Campo, NumberField, SelectField } from "./fields";
+import { ProdutosDoEstoque } from "./produtos-do-estoque";
 
 const CATEGORIAS: { value: CategoriaInsumo; label: string }[] = [
   { value: "mao_de_obra", label: "Mão de obra" },
@@ -167,6 +168,17 @@ export function CustosPanel({ ctx }: { ctx: UseAnalise }) {
                 <Plus /> {c.label}
               </Button>
             ))}
+            <ProdutosDoEstoque
+              onEscolher={(p) =>
+                atualizar((x) => ({
+                  ...x,
+                  insumos: [
+                    ...x.insumos,
+                    { id: novoId(), descricao: `${p.nome} (cód. ${p.codigo})`, categoria: "material", unidade: "un", quantidade: 0, custoUnitario: p.valor, encargosPercentual: null },
+                  ],
+                }))
+              }
+            />
           </div>
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
             {[

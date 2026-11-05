@@ -5,7 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui"
 import type { ParametrosBDI, Tributos } from "@/lib/exequibilidade/types";
 import type { UseAnalise } from "@/hooks/use-analise-exequibilidade";
 import { formatBRL, formatPct } from "@/lib/exequibilidade/format";
-import { Campo, NumberField } from "./fields";
+import { Campo, NumberField, SelectField } from "./fields";
 
 const CAMPOS_BDI: { chave: keyof ParametrosBDI; rotulo: string; sigla: string }[] = [
   { chave: "administracaoCentral", rotulo: "Administração central", sigla: "AC" },
@@ -40,8 +40,9 @@ export function BdiPanel({ ctx }: { ctx: UseAnalise }) {
         <CardHeader>
           <CardTitle>Despesas indiretas e lucro</CardTitle>
           <CardDescription>
-            Percentuais aplicados sobre o custo direto. Valores de partida baseados no Acórdão TCU 2.622/2013
-            (obras) e em referências de mercado; ajuste à realidade da empresa.
+            Percentuais aplicados sobre o custo direto. A fórmula é a do Acórdão TCU 2.622/2013 (obras); as faixas
+            do acórdão NÃO são obrigatórias para fornecimento de bens, servem só de referência. Use os percentuais
+            reais da empresa e guarde a memória de cálculo (despesas, folha, contabilidade) para comprovar.
           </CardDescription>
         </CardHeader>
         <CardContent className="grid gap-4 sm:grid-cols-2">
@@ -57,25 +58,53 @@ export function BdiPanel({ ctx }: { ctx: UseAnalise }) {
         <CardHeader>
           <CardTitle>Tributos sobre o faturamento</CardTitle>
           <CardDescription>
-            Padrão: Lucro Presumido. Para Lucro Real ou Simples, zere as presunções e informe a carga efetiva em
-            “Outros”. O adicional de IRPJ (10%) não é considerado.
+            Escolha o regime da empresa. No Lucro Presumido o adicional de IRPJ (10%) não é considerado. No Simples
+            Nacional use a alíquota efetiva do DAS (já inclui PIS, COFINS, IRPJ, CSLL, CPP e ICMS/ISS do anexo da
+            atividade); confirme com seu contador.
           </CardDescription>
         </CardHeader>
         <CardContent className="grid gap-4 sm:grid-cols-2">
-          {CAMPOS_TRIBUTOS.map((c) => (
-            <Campo key={c.chave} rotulo={c.rotulo} htmlFor={`trib-${c.chave}`}>
-              <NumberField id={`trib-${c.chave}`} suffix="%" value={t[c.chave]} onChange={(v) => setTrib({ [c.chave]: v })} />
-            </Campo>
-          ))}
-          <Campo rotulo="IRPJ — alíquota" htmlFor="irpj-a"><NumberField id="irpj-a" suffix="%" value={t.irpjAliquota} onChange={(v) => setTrib({ irpjAliquota: v })} /></Campo>
-          <Campo rotulo="IRPJ — presunção sobre receita" htmlFor="irpj-p"><NumberField id="irpj-p" suffix="%" value={t.irpjPresuncao} onChange={(v) => setTrib({ irpjPresuncao: v })} /></Campo>
-          <Campo rotulo="CSLL — alíquota" htmlFor="csll-a"><NumberField id="csll-a" suffix="%" value={t.csllAliquota} onChange={(v) => setTrib({ csllAliquota: v })} /></Campo>
-          <Campo rotulo="CSLL — presunção sobre receita" htmlFor="csll-p"><NumberField id="csll-p" suffix="%" value={t.csllPresuncao} onChange={(v) => setTrib({ csllPresuncao: v })} /></Campo>
-          <div className="rounded-lg border bg-muted/40 p-3 text-sm sm:col-span-2">
-            IRPJ efetivo <b className="tabular-nums">{formatPct(r.bdi.irpjEfetivo)}</b> · CSLL efetiva{" "}
-            <b className="tabular-nums">{formatPct(r.bdi.csllEfetivo)}</b> · Carga total (I){" "}
-            <b className="tabular-nums">{formatPct(r.bdi.somaTributos)}</b>
-          </div>
+          <Campo rotulo="Regime tributário" htmlFor="regime" className="sm:col-span-2">
+            <SelectField
+              id="regime"
+              value={t.regime}
+              opcoes={[
+                { value: "presumido", label: "Lucro Presumido" },
+                { value: "simples", label: "Simples Nacional" },
+              ]}
+              onChange={(v) => setTrib({ regime: v })}
+            />
+          </Campo>
+          {t.regime === "simples" ? (
+            <>
+              <Campo rotulo="Alíquota efetiva do Simples (DAS)" htmlFor="simples-a" dica="Alíquota efetiva da faixa de receita bruta dos últimos 12 meses.">
+                <NumberField id="simples-a" suffix="%" value={t.simplesAliquota} onChange={(v) => setTrib({ simplesAliquota: v })} />
+              </Campo>
+              <Campo rotulo="Outros (ex.: ICMS-ST, tributos fora do DAS)" htmlFor="trib-outros">
+                <NumberField id="trib-outros" suffix="%" value={t.outros} onChange={(v) => setTrib({ outros: v })} />
+              </Campo>
+              <div className="rounded-lg border bg-muted/40 p-3 text-sm sm:col-span-2">
+                Carga total (I) <b className="tabular-nums">{formatPct(r.bdi.somaTributos)}</b>
+              </div>
+            </>
+          ) : (
+            <>
+              {CAMPOS_TRIBUTOS.map((c) => (
+                <Campo key={c.chave} rotulo={c.rotulo} htmlFor={`trib-${c.chave}`}>
+                  <NumberField id={`trib-${c.chave}`} suffix="%" value={t[c.chave] as number} onChange={(v) => setTrib({ [c.chave]: v })} />
+                </Campo>
+              ))}
+              <Campo rotulo="IRPJ — alíquota" htmlFor="irpj-a"><NumberField id="irpj-a" suffix="%" value={t.irpjAliquota} onChange={(v) => setTrib({ irpjAliquota: v })} /></Campo>
+              <Campo rotulo="IRPJ — presunção sobre receita" htmlFor="irpj-p"><NumberField id="irpj-p" suffix="%" value={t.irpjPresuncao} onChange={(v) => setTrib({ irpjPresuncao: v })} /></Campo>
+              <Campo rotulo="CSLL — alíquota" htmlFor="csll-a"><NumberField id="csll-a" suffix="%" value={t.csllAliquota} onChange={(v) => setTrib({ csllAliquota: v })} /></Campo>
+              <Campo rotulo="CSLL — presunção sobre receita" htmlFor="csll-p"><NumberField id="csll-p" suffix="%" value={t.csllPresuncao} onChange={(v) => setTrib({ csllPresuncao: v })} /></Campo>
+              <div className="rounded-lg border bg-muted/40 p-3 text-sm sm:col-span-2">
+                IRPJ efetivo <b className="tabular-nums">{formatPct(r.bdi.irpjEfetivo)}</b> · CSLL efetiva{" "}
+                <b className="tabular-nums">{formatPct(r.bdi.csllEfetivo)}</b> · Carga total (I){" "}
+                <b className="tabular-nums">{formatPct(r.bdi.somaTributos)}</b>
+              </div>
+            </>
+          )}
         </CardContent>
       </Card>
 

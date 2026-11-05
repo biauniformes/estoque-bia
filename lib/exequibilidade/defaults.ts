@@ -19,8 +19,10 @@ export const NOMES_TIPO: Record<TipoLicitacao, string> = {
 };
 
 /**
- * Lei 14.133/2021, art. 59, §4º: 75% do valor orçado para obras e serviços de
- * engenharia. Para os demais objetos a lei não fixa percentual: use o do edital.
+ * Lei 14.133/2021, art. 59, §4º: 75% do valor orçado, SÓ para obras e serviços de
+ * engenharia (TCU, Acórdão 963/2024). Bens e serviços em geral: IN SEGES/ME 73/2022,
+ * art. 34 — abaixo de 50% é INDÍCIO de inexequibilidade (Executivo federal); outros
+ * entes seguem o edital. Em qualquer caso a desclassificação exige diligência prévia.
  */
 export const PERCENTUAL_PADRAO: Record<TipoLicitacao, number> = {
   obras: 75,
@@ -59,6 +61,8 @@ export const BDI_PADRAO: Record<TipoLicitacao, ParametrosBDI> = {
 /** Lucro Presumido como ponto de partida. Ajuste ao regime e ao município. */
 export const TRIBUTOS_PADRAO: Record<TipoLicitacao, Tributos> = {
   obras: {
+    regime: "presumido",
+    simplesAliquota: 0,
     pis: 0.65,
     cofins: 3,
     iss: 3,
@@ -71,6 +75,8 @@ export const TRIBUTOS_PADRAO: Record<TipoLicitacao, Tributos> = {
     csllPresuncao: 12,
   },
   servicos: {
+    regime: "presumido",
+    simplesAliquota: 0,
     pis: 0.65,
     cofins: 3,
     iss: 5,
@@ -83,6 +89,8 @@ export const TRIBUTOS_PADRAO: Record<TipoLicitacao, Tributos> = {
     csllPresuncao: 32,
   },
   fornecimento: {
+    regime: "presumido",
+    simplesAliquota: 0,
     pis: 0.65,
     cofins: 3,
     iss: 0,

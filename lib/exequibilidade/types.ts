@@ -49,7 +49,13 @@ export interface ParametrosBDI {
 }
 
 /** Tributos em % sobre o preço de venda (faturamento). */
+export type RegimeTributario = "presumido" | "simples";
+
 export interface Tributos {
+  /** "simples": usa só a alíquota efetiva do Simples Nacional (DAS) + "outros". */
+  regime: RegimeTributario;
+  /** Alíquota efetiva do DAS sobre a receita (já inclui PIS, COFINS, IRPJ, CSLL, CPP e ICMS/ISS). */
+  simplesAliquota: number;
   pis: number;
   cofins: number;
   iss: number;

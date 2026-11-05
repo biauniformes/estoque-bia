@@ -21,7 +21,7 @@ export {
 } from "@/components/ui/dialog";
 
 type Variant = "default" | "secondary" | "outline" | "ghost" | "destructive";
-type Size = "default" | "sm" | "xs" | "icon";
+type Size = "default" | "sm" | "lg" | "xs" | "icon";
 
 export function Button({
   variant = "default",

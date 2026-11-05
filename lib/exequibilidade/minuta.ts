@@ -80,6 +80,9 @@ export function gerarMinuta(a: Analise, r: ResultadoAnalise, data = new Date()):
     avisos.push("Sem insumos informados, a minuta não consegue demonstrar a composição de custos.");
   if (!id.empresa.trim() || !id.objeto.trim())
     avisos.push("Preencha a identificação (empresa, órgão, edital e objeto) para um documento pronto para protocolo.");
+  avisos.push(
+    "Confira as citações legais e de jurisprudência com seu assessor jurídico antes de protocolar, e anexe os documentos que provam cada fundamento (cotações, notas fiscais, contratos): afirmação sem prova não afasta a presunção de inexequibilidade.",
+  );
   if (!Object.values(a.defesa).some((x) => x.ativo))
     avisos.push("Nenhum fundamento de exequibilidade foi marcado: selecione os que correspondem à realidade da empresa.");
 
@@ -116,7 +119,9 @@ export function gerarMinuta(a: Analise, r: ResultadoAnalise, data = new Date()):
   } else {
     push(
       "",
-      "A lei não fixa percentual único de inexequibilidade para este tipo de objeto, cabendo ao edital e à análise do caso concreto aferir se os preços ofertados remuneram os custos do contrato. O entendimento do Tribunal de Contas da União é de que o critério numérico gera mera presunção relativa de inexequibilidade, devendo ser oportunizada ao licitante a demonstração de viabilidade de sua proposta (Súmula TCU nº 262).",
+      "Para bens e serviços em geral a Lei nº 14.133/2021 não fixa percentual de inexequibilidade: o limite de 75% do art. 59, §4º, aplica-se apenas a obras e serviços de engenharia, conforme o entendimento do Tribunal de Contas da União (Acórdão nº 963/2024-Plenário). No âmbito do Poder Executivo federal, a Instrução Normativa SEGES/ME nº 73/2022 (art. 34) considera mero INDÍCIO de inexequibilidade os valores inferiores a 50% do valor orçado pela Administração e dispõe que a inexequibilidade só será considerada após diligência que comprove, cumulativamente, (i) que o custo do licitante ultrapassa o valor da proposta e (ii) que inexistem custos de oportunidade capazes de justificar o vulto da oferta.",
+      "",
+      "O critério numérico, portanto, gera apenas presunção relativa, devendo ser oportunizada ao licitante a demonstração da viabilidade de sua proposta antes de qualquer desclassificação (art. 59, IV e §2º, da Lei nº 14.133/2021; Súmula TCU nº 262; Acórdãos TCU nº 3794/2024-1ª Câmara, 1244/2018-Plenário e 674/2020-Plenário). A análise deve considerar o preço global e todos os itens que o compõem, e não apenas itens isolados (Acórdão TCU nº 379/2024-Plenário).",
     );
   }
   push(
@@ -131,7 +136,7 @@ export function gerarMinuta(a: Analise, r: ResultadoAnalise, data = new Date()):
     `  • Equipamentos: ${formatBRL(r.custos.equipamentos)}`,
     `  • Outros custos diretos: ${formatBRL(r.custos.outros)}`,
     "",
-    `Sobre o custo direto incidem: administração central (${formatPct(a.bdi.administracaoCentral)}), seguro (${formatPct(a.bdi.seguro)}), risco (${formatPct(a.bdi.risco)}), garantia (${formatPct(a.bdi.garantia)}) e despesas financeiras (${formatPct(a.bdi.despesasFinanceiras)}), além dos tributos incidentes sobre o faturamento, que somam ${formatPct(r.bdi.somaTributos)} (PIS ${formatPct(a.tributos.pis)}, COFINS ${formatPct(a.tributos.cofins)}, ISS ${formatPct(a.tributos.iss)}${a.tributos.icms ? `, ICMS ${formatPct(a.tributos.icms)}` : ""}, IRPJ ${formatPct(r.bdi.irpjEfetivo)} e CSLL ${formatPct(r.bdi.csllEfetivo)} efetivos).`,
+    `Sobre o custo direto incidem: administração central (${formatPct(a.bdi.administracaoCentral)}), seguro (${formatPct(a.bdi.seguro)}), risco (${formatPct(a.bdi.risco)}), garantia (${formatPct(a.bdi.garantia)}) e despesas financeiras (${formatPct(a.bdi.despesasFinanceiras)}), além dos tributos incidentes sobre o faturamento, que somam ${formatPct(r.bdi.somaTributos)} ${a.tributos.regime === "simples" ? `(alíquota efetiva do Simples Nacional de ${formatPct(a.tributos.simplesAliquota)}${a.tributos.outros ? ` e outros ${formatPct(a.tributos.outros)}` : ""})` : `(PIS ${formatPct(a.tributos.pis)}, COFINS ${formatPct(a.tributos.cofins)}, ISS ${formatPct(a.tributos.iss)}${a.tributos.icms ? `, ICMS ${formatPct(a.tributos.icms)}` : ""}, IRPJ ${formatPct(r.bdi.irpjEfetivo)} e CSLL ${formatPct(r.bdi.csllEfetivo)} efetivos)`}.`,
     "",
     "Demonstrativo do preço ofertado:",
     `  Custo direto ............................ ${formatBRL(d.custoDireto)}`,

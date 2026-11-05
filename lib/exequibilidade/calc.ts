@@ -97,17 +97,19 @@ export function calcularCustos(
 /* --------------------------- BDI e tributos -------------------------- */
 
 export function calcularBDI(b: ParametrosBDI, t: Tributos): ResultadoBDI {
-  const irpjEfetivo = (num(t.irpjAliquota) * num(t.irpjPresuncao)) / 100;
-  const csllEfetivo = (num(t.csllAliquota) * num(t.csllPresuncao)) / 100;
-  const somaTributos =
-    num(t.pis) +
-    num(t.cofins) +
-    num(t.iss) +
-    num(t.icms) +
-    num(t.cprb) +
-    num(t.outros) +
-    irpjEfetivo +
-    csllEfetivo;
+  const simples = t.regime === "simples";
+  const irpjEfetivo = simples ? 0 : (num(t.irpjAliquota) * num(t.irpjPresuncao)) / 100;
+  const csllEfetivo = simples ? 0 : (num(t.csllAliquota) * num(t.csllPresuncao)) / 100;
+  const somaTributos = simples
+    ? num(t.simplesAliquota) + num(t.outros)
+    : num(t.pis) +
+      num(t.cofins) +
+      num(t.iss) +
+      num(t.icms) +
+      num(t.cprb) +
+      num(t.outros) +
+      irpjEfetivo +
+      csllEfetivo;
   if (somaTributos >= 100) {
     return {
       somaTributos,
