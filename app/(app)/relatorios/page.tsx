@@ -62,10 +62,10 @@ async function RelatoriosAdmin({ sp }: { sp: Record<string, string | string[] | 
           <Field label="Empresa" htmlFor="empresa" hint="Vale para os relatórios abaixo (telas e Excel).">
             <Select id="empresa" name="empresa" defaultValue={marca} className="w-56">
               <option value="">Todas as empresas</option>
-              {EMPRESAS.map((m) => (
-                <option key={m} value={m}>{m}</option>
+              {/* só as empresas que têm item com estoque (mais a que estiver selecionada) */}
+              {[...EMPRESAS, SEM_EMPRESA].filter((m) => m === marca || resumo.some((r) => r.empresa === m)).map((m) => (
+                <option key={m} value={m}>{empresaLabel(m)}</option>
               ))}
-              <option value={SEM_EMPRESA}>{empresaLabel(SEM_EMPRESA)}</option>
             </Select>
           </Field>
           <Field label="Versão do Excel" htmlFor="versao" hint="“Para operador” sai só com código, nome e quantidade.">

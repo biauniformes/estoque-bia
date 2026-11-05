@@ -96,7 +96,7 @@ export async function getMovedStock(incluirZerados: boolean, empresa: FiltroEmpr
   return { rows, pecas, valor };
 }
 
-/** Resumo por empresa a partir de uma lista de itens (já em memória). */
+/** Resumo por empresa a partir de uma lista de itens (já em memória). Só entram as empresas que têm algum item com estoque. */
 export function resumoPorEmpresa(rows: StockRow[]) {
   const nomes = [...EMPRESAS, SEM_EMPRESA] as const;
   return nomes.map((e) => {
@@ -109,7 +109,7 @@ export function resumoPorEmpresa(rows: StockRow[]) {
       pecas: comEstoque.reduce((s, r) => s + r.estoque, 0),
       valor: comEstoque.reduce((s, r) => s + Number(r.valor_total ?? 0), 0),
     };
-  });
+  }).filter((r) => r.comEstoque > 0);
 }
 
 // ------------------------------------------------------------------ planilhas

@@ -1,5 +1,5 @@
 import { Download, FileSpreadsheet, Package } from "lucide-react";
-import { EMPRESAS, SEM_EMPRESA, empresaLabel, getStockSnapshot, parseEmpresa } from "@/services/reports";
+import { EMPRESAS, SEM_EMPRESA, empresaLabel, getStockSnapshot, parseEmpresa, resumoPorEmpresa } from "@/services/reports";
 import { first, formatNumber, variantLabel } from "@/lib/utils";
 import { PageHeader, StatCard } from "@/components/shared/page-header";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -14,7 +14,8 @@ const MAX_ROWS_ON_SCREEN = 100;
 export async function RelatorioOperador({ sp }: { sp: Record<string, string | string[] | undefined> }) {
   const empresa = parseEmpresa(first(sp.empresa));
   const zerados = first(sp.zerados) === "1";
-  const { rows, pecas } = await getStockSnapshot(empresa, !zerados);
+  const [{ rows, pecas }, todas] = await Promise.all([getStockSnapshot(empresa, !zerados), getStockSnapshot("", true)]);
+  const comEstoque = resumoPorEmpresa(todas.rows).map((r) => r.empresa);
   const eq = empresa ? `&empresa=${empresa}` : "";
 
   return (
@@ -26,10 +27,9 @@ export async function RelatorioOperador({ sp }: { sp: Record<string, string | st
           <Field label="Empresa" htmlFor="empresa">
             <Select id="empresa" name="empresa" defaultValue={empresa} className="w-56">
               <option value="">Todas as empresas</option>
-              {EMPRESAS.map((e) => (
-                <option key={e} value={e}>{e}</option>
+              {[...EMPRESAS, SEM_EMPRESA].filter((e) => e === empresa || comEstoque.includes(e)).map((e) => (
+                <option key={e} value={e}>{empresaLabel(e)}</option>
               ))}
-              <option value={SEM_EMPRESA}>{empresaLabel(SEM_EMPRESA)}</option>
             </Select>
           </Field>
           <label className="mb-1 flex min-h-12 items-center gap-3 font-semibold text-slate-700">
