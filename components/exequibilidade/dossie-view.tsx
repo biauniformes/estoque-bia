@@ -2,7 +2,7 @@
 
 import { useMemo } from "react";
 import Link from "next/link";
-import { ArrowLeft, Printer } from "lucide-react";
+import { ArrowLeft, FileSpreadsheet, Printer } from "lucide-react";
 import { Button } from "./ui";
 import { analisar } from "@/lib/exequibilidade/calc";
 import { gerarMinuta, rotuloStatus } from "@/lib/exequibilidade/minuta";
@@ -29,6 +29,7 @@ const ROTULO_CAT: Record<CategoriaInsumo, string> = {
 const SECAO = "mt-8 break-before-page";
 
 export function DossieView({
+  licitacaoId,
   titulo,
   status,
   dataSessao,
@@ -37,6 +38,7 @@ export function DossieView({
   anexos,
   documentosEmpresa,
 }: {
+  licitacaoId: string;
   titulo: string;
   status: string;
   dataSessao: string | null;
@@ -60,6 +62,9 @@ export function DossieView({
         </Button>
         <Button size="lg" onClick={() => window.print()}>
           <Printer className="h-5 w-5" /> Imprimir / salvar em PDF
+        </Button>
+        <Button asChild size="lg" variant="outline">
+          <a href={`/exequibilidade/${licitacaoId}/excel`}><FileSpreadsheet className="h-5 w-5" /> Baixar em Excel</a>
         </Button>
         <p className="text-sm text-slate-600">Na janela de impressão escolha “Salvar como PDF”. Anexe depois os arquivos listados no índice, na mesma ordem.</p>
       </div>

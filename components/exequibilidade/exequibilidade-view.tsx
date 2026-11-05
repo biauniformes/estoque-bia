@@ -9,6 +9,7 @@ import {
   Calculator,
   ClipboardCheck,
   Download,
+  FileSpreadsheet,
   FileText,
   FlaskConical,
   Gavel,
@@ -162,6 +163,19 @@ export function ExequibilidadeView({
         <div className="mt-3 flex flex-wrap items-center gap-2">
           <Button size="sm" asChild>
             <Link href={`/exequibilidade/${licitacao.id}/dossie`}><Printer className="h-4 w-4" /> Dossiê para imprimir / PDF</Link>
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={pending}
+            onClick={() =>
+              start(async () => {
+                await ctx.salvarAgora(); // garante que o Excel saia com os últimos dados
+                window.open(`/exequibilidade/${licitacao.id}/excel`, "_self");
+              })
+            }
+          >
+            <FileSpreadsheet className="h-4 w-4" /> Baixar em Excel
           </Button>
           <Button size="sm" variant="outline" onClick={ctx.carregarExemplo}>
             <FlaskConical className="h-4 w-4" /> Exemplo

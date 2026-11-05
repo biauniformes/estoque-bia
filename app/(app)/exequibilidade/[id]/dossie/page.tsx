@@ -17,6 +17,7 @@ export default async function DossiePage({ params }: { params: Promise<{ id: str
   const [anexos, documentosEmpresa] = await Promise.all([listAnexos(id), listAnexos(null)]);
   return (
     <DossieView
+      licitacaoId={lic.id}
       titulo={lic.titulo}
       status={lic.status}
       dataSessao={lic.data_sessao}
