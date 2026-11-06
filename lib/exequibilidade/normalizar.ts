@@ -6,7 +6,7 @@ export function normalizar(bruto: unknown): Analise | null {
   if (!bruto || typeof bruto !== "object") return null;
   const b = bruto as Partial<Analise>;
   if (!b.parametros || !Array.isArray(b.insumos)) return null;
-  const base = analiseVazia(b.parametros.tipo ?? "obras");
+  const base = analiseVazia(b.parametros.tipo ?? "fornecimento");
   return {
     ...base,
     ...b,
