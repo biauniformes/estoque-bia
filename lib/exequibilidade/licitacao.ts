@@ -143,7 +143,7 @@ export const CHECKLIST: GrupoChecklist[] = [
     titulo: "Prova de exequibilidade da proposta",
     descricao: "Art. 59 IV e §2º; IN SEGES/ME 73/2022, art. 34 — o edital deve prever os documentos; guarde tudo antes da diligência.",
     itens: [
-      { chave: "planilha", titulo: "Planilha de custos e formação de preços assinada (readequada ao lance vencedor)", base: "IN 73/2022, art. 31", categoria: "planilha" },
+      { chave: "planilha", titulo: "Planilha de custos e formação de preços assinada (readequada ao lance vencedor)", base: "IN 73/2022, art. 31", categoria: "planilha", condicional: true },
       { chave: "cotacoes", titulo: "Cotações de tecido, aviamentos e serviços (fornecedores e data)", base: "Art. 59, §2º", categoria: "cotacao" },
       { chave: "notas", titulo: "Notas fiscais de compra recentes dos mesmos insumos", base: "Art. 59, §2º", categoria: "nota_fiscal" },
       { chave: "contratos", titulo: "Contratos de fornecimento executados com preços semelhantes", base: "Art. 59, §2º", categoria: "contrato" },

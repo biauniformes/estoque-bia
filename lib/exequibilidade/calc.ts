@@ -257,6 +257,15 @@ export function analisar(a: Analise): ResultadoAnalise {
   const custos = calcularCustos(a.insumos, encargos.total);
   const bdi = calcularBDI(a.bdi, a.tributos);
   if (!bdi.valido && bdi.erro) avisos.push(bdi.erro);
+  if (
+    a.tributos.regime === "simples" &&
+    a.encargos.modo === "detalhado" &&
+    a.insumos.some((i) => i.categoria === "mao_de_obra") &&
+    a.encargos.itens.some((i) => ["a1", "a2", "a3", "a4", "a5", "a6", "a7"].includes(i.id) && num(i.percentual) > 0)
+  )
+    avisos.push(
+      "Simples Nacional: INSS patronal e contribuições ao Sistema S (salário-educação, SESI/SENAI, INCRA, SEBRAE) costumam estar dentro do DAS nos anexos I a III. Se for o seu caso, zere esses itens nos encargos para não contar duas vezes (confirme com o contador).",
+    );
 
   const E = num(p.valorEstimado);
   const P = num(p.precoOfertado);
