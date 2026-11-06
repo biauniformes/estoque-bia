@@ -18,6 +18,23 @@ export interface Insumo {
   custoUnitario: number;
   /** Só mão de obra: sobrescreve o % global de encargos sociais. null = usar global. */
   encargosPercentual: number | null;
+  /** Quadro de cotações de fornecedores que comprova o custo unitário. */
+  cotacoes?: Cotacao[];
+  /** Como o custo unitário sai das cotações. "manual" = digitado. Padrão: "menor". */
+  criterioCotacao?: CriterioCotacao;
+}
+
+export type CriterioCotacao = "menor" | "mediana" | "media" | "manual";
+
+export interface Cotacao {
+  id: string;
+  fornecedor: string;
+  /** AAAA-MM-DD */
+  data: string;
+  /** Preço por unidade do insumo (mesma unidade da planilha). */
+  valor: number;
+  /** Documento guardado em Anexos (orçamento, e-mail, nota fiscal). */
+  anexoId: string | null;
 }
 
 export type GrupoEncargo = "A" | "B" | "C";

@@ -13,6 +13,8 @@ import {
   type Checklist,
 } from "@/lib/exequibilidade/licitacao";
 import type { Analise, CategoriaInsumo } from "@/lib/exequibilidade/types";
+import { cotacoesValidas, resumoCotacoes, rotuloCriterio } from "@/lib/exequibilidade/cotacoes";
+import { rotulosTaxa } from "@/lib/exequibilidade/rotulos";
 
 const BRL = '"R$" #,##0.00;[Red]-"R$" #,##0.00';
 const PCT = "0.00%";
@@ -111,8 +113,66 @@ export async function montarPlanilha(d: DadosPlanilha): Promise<Buffer> {
 
   const wsResumo = wb.addWorksheet("Resumo", { views: [{ showGridLines: false }] });
   const wsCustos = wb.addWorksheet("Custos", { views: [{ state: "frozen", ySplit: 4 }] });
+  const comCotacao = a.insumos.filter((i) => cotacoesValidas(i.cotacoes).length > 0);
+  const wsCot = comCotacao.length ? wb.addWorksheet("Cotações", { views: [{ state: "frozen", ySplit: 4 }] }) : null;
   const wsEnc = wb.addWorksheet("Encargos");
-  const wsBdi = wb.addWorksheet("BDI e Tributos");
+  const rt = rotulosTaxa(a.parametros.tipo);
+  const NOME_TAXA = rt.planilha;
+  const wsBdi = wb.addWorksheet(NOME_TAXA);
+
+  /* ===================== COTAÇÕES ===================== */
+  const indiceAnexos = [...d.anexos, ...d.documentosEmpresa];
+  /** insumoId -> célula do custo adotado na aba Cotações */
+  const custoCotado = new Map<string, string>();
+  if (wsCot) {
+    titulo(wsCot, "Quadro de cotações — origem dos custos unitários", "Preços obtidos junto a fornecedores para cada insumo. O custo adotado é levado automaticamente para a aba Custos (quando o critério não é “valor informado”). Os documentos estão no índice da aba Anexos.", 10);
+    wsCot.columns = [{ width: 6 }, { width: 40 }, { width: 30 }, { width: 13 }, { width: 15 }, { width: 15 }, { width: 15 }, { width: 15 }, { width: 22 }, { width: 18 }];
+    cabecalho(wsCot, 4, ["Item", "Insumo", "Fornecedor", "Data", "Preço unitário", "Documento", "", "", "", ""]);
+    let lq = 5;
+    const faixas: { i: (typeof a.insumos)[number]; item: number; de: number; ate: number }[] = [];
+    for (const i of comCotacao) {
+      const item = a.insumos.indexOf(i) + 1;
+      const de = lq;
+      for (const c of cotacoesValidas(i.cotacoes)) {
+        const k = c.anexoId ? indiceAnexos.findIndex((x) => x.id === c.anexoId) : -1;
+        const [y, m, dd] = /^\d{4}-\d{2}-\d{2}$/.test(c.data) ? c.data.split("-").map(Number) : [0, 0, 0];
+        wsCot.getRow(lq).values = [item, `${i.descricao || "—"} (${i.unidade})`, c.fornecedor || "—", y ? new Date(Date.UTC(y, m - 1, dd)) : "—", c.valor, k >= 0 ? `Anexo nº ${k + 1}` : "—"];
+        wsCot.getCell(lq, 4).numFmt = "dd/mm/yyyy";
+        wsCot.getCell(lq, 5).numFmt = BRL;
+        lq++;
+      }
+      bordas(wsCot, de, lq - 1, 6);
+      faixas.push({ i, item, de, ate: lq - 1 });
+      lq++;
+    }
+    secao(wsCot, lq, "Resumo por insumo (fórmulas sobre as cotações acima)", 10);
+    lq++;
+    cabecalho(wsCot, lq, ["Item", "Insumo", "Nº de cotações", "Menor", "Mediana", "Média", "Maior", "Variação (desvio ÷ média)", "Critério", "Custo adotado"]);
+    lq++;
+    const iniQ = lq;
+    for (const { i, item, de, ate } of faixas) {
+      const rc = resumoCotacoes(i.cotacoes)!;
+      const E = `E${de}:E${ate}`;
+      const crit = i.criterioCotacao ?? "menor";
+      wsCot.getRow(lq).values = [item, i.descricao || "—"];
+      wsCot.getCell(lq, 3).value = f(`COUNT(${E})`, rc.n);
+      wsCot.getCell(lq, 4).value = f(`MIN(${E})`, rc.menor);
+      wsCot.getCell(lq, 5).value = f(`MEDIAN(${E})`, rc.mediana);
+      wsCot.getCell(lq, 6).value = f(`AVERAGE(${E})`, rc.media);
+      wsCot.getCell(lq, 7).value = f(`MAX(${E})`, rc.maior);
+      wsCot.getCell(lq, 8).value = f(`IF(F${lq}>0,STDEVP(${E})/F${lq},0)`, rc.cv / 100);
+      wsCot.getCell(lq, 9).value = rotuloCriterio(crit);
+      wsCot.getCell(lq, 10).value =
+        crit === "menor" ? f(`D${lq}`, i.custoUnitario) : crit === "mediana" ? f(`E${lq}`, i.custoUnitario) : crit === "media" ? f(`ROUND(F${lq},2)`, i.custoUnitario) : i.custoUnitario;
+      for (const c of [4, 5, 6, 7, 10]) wsCot.getCell(lq, c).numFmt = BRL;
+      wsCot.getCell(lq, 8).numFmt = PCT;
+      wsCot.getCell(lq, 10).font = { bold: true };
+      if (crit !== "manual") custoCotado.set(i.id, ref("Cotações", `$J$${lq}`));
+      lq++;
+    }
+    bordas(wsCot, iniQ, lq - 1, 10);
+    configurarImpressao(wsCot);
+  }
   const wsComp = wb.addWorksheet("Composição do Preço");
   const wsExeq = wb.addWorksheet("Exequibilidade");
   const wsDef = wb.addWorksheet("Defesa");
@@ -184,7 +244,8 @@ export async function montarPlanilha(d: DadosPlanilha): Promise<Buffer> {
   let lc = iniC;
   a.insumos.forEach((i, n) => {
     const mo = i.categoria === "mao_de_obra";
-    wsCustos.getRow(lc).values = [n + 1, i.descricao || "—", ROTULO_CAT[i.categoria], i.unidade, i.quantidade, i.custoUnitario, "", ""];
+    const cot = custoCotado.get(i.id);
+    wsCustos.getRow(lc).values = [n + 1, i.descricao || "—", ROTULO_CAT[i.categoria], i.unidade, i.quantidade, cot ? f(cot, i.custoUnitario) : i.custoUnitario, "", ""];
     wsCustos.getCell(lc, 5).numFmt = QTD;
     wsCustos.getCell(lc, 6).numFmt = BRL;
     if (mo) {
@@ -229,7 +290,7 @@ export async function montarPlanilha(d: DadosPlanilha): Promise<Buffer> {
 
   /* ===================== BDI E TRIBUTOS ===================== */
   const t = a.tributos;
-  titulo(wsBdi, "BDI e tributos", "BDI = [(1 + AC + S + R + G) × (1 + DF) × (1 + L) ÷ (1 − I)] − 1 (fórmula do Acórdão TCU 2.622/2013-Plenário). Percentuais de despesas incidem sobre o custo direto; tributos sobre o preço de venda.", 3);
+  titulo(wsBdi, a.parametros.tipo === "obras" ? "BDI e tributos" : "Despesas indiretas, tributos e lucro", `${rt.formula}. Percentuais de despesas incidem sobre o custo direto; tributos sobre o preço de venda.`, 3);
   wsBdi.columns = [{ width: 52 }, { width: 18 }, { width: 46 }];
   cabecalho(wsBdi, 4, ["Componente", "Percentual", "Observação"]);
   const linhasBdi: [string, number, string][] = [
@@ -301,24 +362,24 @@ export async function montarPlanilha(d: DadosPlanilha): Promise<Buffer> {
   const celI = `B${lb}`;
   bordas(wsBdi, iniT, lb, 3);
   lb += 2;
-  secao(wsBdi, lb, "Resultado do BDI", 3);
+  secao(wsBdi, lb, a.parametros.tipo === "obras" ? "Resultado do BDI" : "Resultado", 3);
   lb++;
-  wsBdi.getCell(lb, 1).value = "BDI";
+  wsBdi.getCell(lb, 1).value = rt.nome;
   wsBdi.getCell(lb, 1).font = { bold: true };
   wsBdi.getCell(lb, 2).value = f(`(1+B${rAC}+B${rS}+B${rR}+B${rG})*(1+B${rDF})*(1+B${rL})/(1-${celI})-1`, p(r.bdi.bdi));
   wsBdi.getCell(lb, 2).numFmt = PCT;
   wsBdi.getCell(lb, 2).font = { bold: true };
   const celBDI = `B${lb}`;
   lb++;
-  wsBdi.getCell(lb, 1).value = "Preço de referência = Custo direto × (1 + BDI)";
+  wsBdi.getCell(lb, 1).value = `Preço de referência = Custo direto × (1 + ${rt.sigla})`;
   wsBdi.getCell(lb, 2).value = f(`${cdRef}*(1+${celBDI})`, r.precoReferencia);
   wsBdi.getCell(lb, 2).numFmt = BRL;
   configurarImpressao(wsBdi, false);
-  const A = (c: string) => ref("BDI e Tributos", `$B$${c}`);
-  const iRef = ref("BDI e Tributos", `$${celI[0]}$${celI.slice(1)}`);
+  const A = (c: string) => ref(NOME_TAXA, `$B$${c}`);
+  const iRef = ref(NOME_TAXA, `$${celI[0]}$${celI.slice(1)}`);
 
   /* ===================== COMPOSIÇÃO DO PREÇO ===================== */
-  titulo(wsComp, "Composição do preço ofertado", "Demonstra como o preço ofertado cobre custos, despesas, tributos e lucro. Todos os valores são fórmulas ligadas às planilhas de custos e de BDI.", 3);
+  titulo(wsComp, "Composição do preço ofertado", "Demonstra como o preço ofertado cobre custos, despesas, tributos e lucro. Todos os valores são fórmulas ligadas às planilhas de custos e de " + (a.parametros.tipo === "obras" ? "BDI." : "despesas, tributos e lucro."), 3);
   wsComp.columns = [{ width: 56 }, { width: 20 }, { width: 48 }];
   cabecalho(wsComp, 4, ["Item", "Valor", "Cálculo"]);
   const dec = r.decomposicao;
@@ -547,7 +608,7 @@ export async function montarPlanilha(d: DadosPlanilha): Promise<Buffer> {
     ["Limite de inexequibilidade", f(xr("$B$11"), r.limiteLegal), BRL],
     ["Custo direto total", f(cdRef, r.custos.custoDireto), BRL],
     ["Encargos sociais (mão de obra)", f(encRef, p(r.encargos.total)), PCT],
-    ["BDI", f(A(celBDI.slice(1)), p(r.bdi.bdi)), PCT],
+    [rt.nome, f(A(celBDI.slice(1)), p(r.bdi.bdi)), PCT],
     ["Carga tributária sobre o preço", f(iRef, p(r.bdi.somaTributos)), PCT],
     ["Lucro líquido", f(cr("$B$10"), dec.lucro), BRL],
     ["Margem líquida sobre o preço", f(cr("$B$11"), dec.margemSobrePreco / 100), PCT],
@@ -574,8 +635,9 @@ export async function montarPlanilha(d: DadosPlanilha): Promise<Buffer> {
   lr++;
   const abas = [
     ["Custos", "Insumos, quantidades, custos unitários e totais por categoria"],
+    ...(wsCot ? [["Cotações", "Quadro de cotações de fornecedores que comprova cada custo unitário"]] : []),
     ["Encargos", "Encargos sociais e trabalhistas (Grupos A, B, C e D)"],
-    ["BDI e Tributos", "Componentes do BDI, tributos e fórmula do BDI"],
+    [NOME_TAXA, a.parametros.tipo === "obras" ? "Componentes do BDI, tributos e fórmula do BDI" : "Despesas indiretas, tributos sobre a venda, lucro e a taxa resultante"],
     ["Composição do Preço", "Do preço ofertado ao lucro líquido, com ponto de equilíbrio"],
     ["Exequibilidade", "Limite legal, situação, cenários de preço e concorrentes"],
     ["Defesa", "Minuta da defesa de exequibilidade"],

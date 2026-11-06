@@ -2166,3 +2166,7 @@ create policy licitacoes_storage_admin on storage.objects
   for all to authenticated
   using (bucket_id = 'licitacoes' and public.is_admin())
   with check (bucket_id = 'licitacoes' and public.is_admin());
+
+-- 0019_licitacao_prazos.sql
+alter table public.licitacoes
+  add column if not exists prazos jsonb not null default '[]'::jsonb;

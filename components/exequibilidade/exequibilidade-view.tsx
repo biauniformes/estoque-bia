@@ -23,8 +23,10 @@ import { cn } from "@/lib/utils";
 import { useAnalise } from "@/hooks/use-analise-exequibilidade";
 import { formatBRL, formatPct } from "@/lib/exequibilidade/format";
 import { atualizarCabecalhoAction, excluirLicitacaoAction, salvarAnaliseAction } from "@/app/actions/licitacoes";
-import { STATUS_LICITACAO, type Anexo, type Checklist, type StatusLicitacao } from "@/lib/exequibilidade/licitacao";
+import { STATUS_LICITACAO, type Anexo, type Checklist, type Prazo, type StatusLicitacao } from "@/lib/exequibilidade/licitacao";
+import { PrazosLicitacao } from "./prazos";
 import type { Analise } from "@/lib/exequibilidade/types";
+import { rotulosTaxa } from "@/lib/exequibilidade/rotulos";
 import { Select } from "@/components/ui/input";
 import { AnalisePanel } from "./analise-panel";
 import { AnexosPanel } from "./anexos-panel";
@@ -65,8 +67,10 @@ export function ExequibilidadeView({
   checklist,
   anexos,
   documentosEmpresa,
+  prazos,
 }: {
   licitacao: LicitacaoCabecalho;
+  prazos: Prazo[];
   inicial: Analise;
   checklist: Checklist;
   anexos: Anexo[];
@@ -160,6 +164,7 @@ export function ExequibilidadeView({
           </label>
         </div>
         {msgCab && <p role="alert" className="mt-2 text-sm font-semibold text-red-700">{msgCab}</p>}
+        <PrazosLicitacao licitacaoId={licitacao.id} inicial={prazos} />
         <div className="mt-3 flex flex-wrap items-center gap-2">
           <Button size="sm" asChild>
             <Link href={`/exequibilidade/${licitacao.id}/dossie`}><Printer className="h-4 w-4" /> Dossiê para imprimir / PDF</Link>
@@ -223,13 +228,13 @@ export function ExequibilidadeView({
               aba === v ? "bg-slate-900 text-white" : "bg-white text-slate-700 ring-2 ring-slate-200 hover:bg-slate-100",
             )}
           >
-            <Icone className="h-4 w-4" /> {rotulo}
+            <Icone className="h-4 w-4" /> {v === "bdi" ? rotulosTaxa(a.parametros.tipo).aba : rotulo}
           </button>
         ))}
       </div>
 
       {aba === "parametros" && <ParametrosPanel ctx={ctx} />}
-      {aba === "custos" && <CustosPanel ctx={ctx} />}
+      {aba === "custos" && <CustosPanel ctx={ctx} anexos={anexos} />}
       {aba === "bdi" && <BdiPanel ctx={ctx} />}
       {aba === "analise" && <AnalisePanel ctx={ctx} />}
       {aba === "minuta" && <MinutaPanel ctx={ctx} />}

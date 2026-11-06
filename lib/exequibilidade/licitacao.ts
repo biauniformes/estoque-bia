@@ -38,6 +38,8 @@ export type Licitacao = {
   status_exequibilidade: string | null;
   analise: unknown;
   checklist: Checklist;
+  /** Ausente enquanto a migração 0019 não foi aplicada. */
+  prazos?: Prazo[] | null;
   created_at: string;
   updated_at: string;
 };
@@ -60,6 +62,63 @@ export type Anexo = {
 };
 
 export type Checklist = Record<string, { ok: boolean; obs?: string }>;
+
+/* ------------------------------- Prazos ------------------------------- */
+
+export const TIPOS_PRAZO = [
+  { value: "diligencia", label: "Resposta à diligência / prova de exequibilidade", dica: "Prazo dado pelo pregoeiro no chat. Mínimo de 2 horas, prorrogável se pedido antes de vencer (IN SEGES/ME 73/2022, art. 29)." },
+  { value: "proposta", label: "Envio da proposta readequada e planilha", dica: "Proposta ajustada ao lance vencedor, pelo sistema (IN 73/2022, art. 29)." },
+  { value: "habilitacao", label: "Envio de documentos de habilitação", dica: "Só do licitante vencedor, depois do julgamento (Lei 14.133, art. 63, II)." },
+  { value: "amostra", label: "Entrega de amostra", dica: "Data e local definidos no edital ou pelo pregoeiro." },
+  { value: "recurso", label: "Recurso / contrarrazões", dica: "Intenção de recorrer logo após a habilitação; razões em 3 dias úteis (Lei 14.133, art. 165)." },
+  { value: "assinatura", label: "Assinatura do contrato / ata", dica: "Prazo da convocação do edital; a recusa sujeita a penalidades (art. 90)." },
+  { value: "entrega", label: "Entrega dos uniformes", dica: "Prazo da ordem de fornecimento / empenho." },
+  { value: "outro", label: "Outro prazo", dica: "" },
+] as const;
+export type TipoPrazo = (typeof TIPOS_PRAZO)[number]["value"];
+export const rotuloTipoPrazo = (v: string) => TIPOS_PRAZO.find((t) => t.value === v)?.label ?? v;
+
+export type Prazo = {
+  id: string;
+  tipo: TipoPrazo;
+  descricao: string;
+  /** Horário local "AAAA-MM-DDTHH:MM" (como o campo datetime-local). */
+  quando: string;
+  concluido: boolean;
+};
+
+export const PRAZO_REGEX = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/;
+
+/** Milissegundos até o prazo (negativo = vencido). Interpreta a data no fuso do navegador. */
+export const msParaPrazo = (p: Prazo, agora = Date.now()) => new Date(p.quando).getTime() - agora;
+
+export type NivelPrazo = "vencido" | "urgente" | "proximo" | "futuro" | "concluido";
+
+export function nivelPrazo(p: Prazo, agora = Date.now()): NivelPrazo {
+  if (p.concluido) return "concluido";
+  const ms = msParaPrazo(p, agora);
+  if (ms < 0) return "vencido";
+  if (ms <= 24 * 3600_000) return "urgente";
+  if (ms <= 7 * 24 * 3600_000) return "proximo";
+  return "futuro";
+}
+
+/** "faltam 1 h 25 min", "vencido há 2 dias"… */
+export function textoContagem(p: Prazo, agora = Date.now()): string {
+  if (p.concluido) return "concluído";
+  const ms = msParaPrazo(p, agora);
+  const abs = Math.abs(ms);
+  const min = Math.floor(abs / 60_000);
+  const h = Math.floor(min / 60);
+  const dias = Math.floor(h / 24);
+  const t = dias >= 2 ? `${dias} dias` : h >= 1 ? `${h} h${min % 60 ? ` ${min % 60} min` : ""}` : `${min} min`;
+  return ms < 0 ? `vencido há ${t}` : `faltam ${t}`;
+}
+
+export const formatPrazo = (quando: string) => {
+  const [d, hm] = quando.split("T");
+  return `${formatDataBR(d)} às ${hm}`;
+};
 
 export type ItemChecklist = {
   chave: string;

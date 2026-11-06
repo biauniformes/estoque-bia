@@ -22,7 +22,9 @@ import { useState } from "react";
 import { formatBRL, formatPct } from "@/lib/exequibilidade/format";
 import { Campo, NumberField, SelectField } from "./fields";
 import { ProdutosDoEstoque } from "./produtos-do-estoque";
-
+import { CotacoesDialog } from "./cotacoes-dialog";
+import type { Anexo } from "@/lib/exequibilidade/licitacao";
+import { problemasCotacoes, resumoCotacoes, rotuloCriterio, usaCotacoes } from "@/lib/exequibilidade/cotacoes";
 const CATEGORIAS: { value: CategoriaInsumo; label: string }[] = [
   { value: "mao_de_obra", label: "Mão de obra" },
   { value: "material", label: "Material" },
@@ -30,8 +32,13 @@ const CATEGORIAS: { value: CategoriaInsumo; label: string }[] = [
   { value: "outros", label: "Outros" },
 ];
 
-export function CustosPanel({ ctx }: { ctx: UseAnalise }) {
+export function CustosPanel({ ctx, anexos }: { ctx: UseAnalise; anexos: Anexo[] }) {
   const { analise: a, resultado: r, atualizar } = ctx;
+  const [cotandoId, setCotandoId] = useState<string | null>(null);
+  const cotando = a.insumos.find((i) => i.id === cotandoId) ?? null;
+  const problemas = problemasCotacoes(a);
+  const semCotacao = problemas.filter((p) => p.tipo === "sem_cotacao");
+  const outrosProblemas = problemas.filter((p) => p.tipo !== "sem_cotacao");
 
   const setInsumo = (id: string, patch: Partial<Insumo>) =>
     atualizar((x) => ({
@@ -71,20 +78,21 @@ export function CustosPanel({ ctx }: { ctx: UseAnalise }) {
             <Table className="min-w-[860px]">
               <TableHeader>
                 <TableRow>
-                  <TableHead className="w-[28%]">Descrição</TableHead>
-                  <TableHead className="w-[14%]">Categoria</TableHead>
+                  <TableHead className="w-[25%]">Descrição</TableHead>
+                  <TableHead className="w-[12%]">Categoria</TableHead>
                   <TableHead className="w-[7%]">Unid.</TableHead>
-                  <TableHead className="w-[11%] text-right">Qtd. total</TableHead>
+                  <TableHead className="w-[10%] text-right">Qtd. total</TableHead>
                   <TableHead className="w-[13%] text-right">Custo unit.</TableHead>
-                  <TableHead className="w-[9%] text-right">Encargos</TableHead>
-                  <TableHead className="w-[14%] text-right">Total</TableHead>
+                  <TableHead className="w-[10%]">Cotações</TableHead>
+                  <TableHead className="w-[8%] text-right">Encargos</TableHead>
+                  <TableHead className="w-[13%] text-right">Total</TableHead>
                   <TableHead className="w-10" />
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {a.insumos.length === 0 && (
                   <TableRow>
-                    <TableCell colSpan={8} className="py-8 text-center text-sm text-muted-foreground">
+                    <TableCell colSpan={9} className="py-8 text-center text-sm text-muted-foreground">
                       Nenhum insumo. Adicione mão de obra, materiais e equipamentos abaixo, ou carregue o exemplo.
                     </TableCell>
                   </TableRow>
@@ -119,7 +127,17 @@ export function CustosPanel({ ctx }: { ctx: UseAnalise }) {
                       <NumberField aria-label="Quantidade" value={i.quantidade} onChange={(v) => setInsumo(i.id, { quantidade: v })} />
                     </TableCell>
                     <TableCell>
-                      <NumberField aria-label="Custo unitário" prefix="R$" value={i.custoUnitario} onChange={(v) => setInsumo(i.id, { custoUnitario: v })} />
+                      {usaCotacoes(i) ? (
+                        <div className="text-right" title={`Calculado pelas cotações (${rotuloCriterio(i.criterioCotacao)})`}>
+                          <div className="font-semibold tabular-nums">{formatBRL(i.custoUnitario)}</div>
+                          <div className="text-[10px] text-muted-foreground">{rotuloCriterio(i.criterioCotacao)}</div>
+                        </div>
+                      ) : (
+                        <NumberField aria-label="Custo unitário" prefix="R$" value={i.custoUnitario} onChange={(v) => setInsumo(i.id, { custoUnitario: v })} />
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      <BotaoCotacoes insumo={i} onClick={() => setCotandoId(i.id)} />
                     </TableCell>
                     <TableCell className="text-right">
                       {i.categoria === "mao_de_obra" ? (
@@ -151,7 +169,7 @@ export function CustosPanel({ ctx }: { ctx: UseAnalise }) {
               </TableBody>
               <TableFooter>
                 <TableRow>
-                  <TableCell colSpan={6} className="text-right font-semibold">
+                  <TableCell colSpan={7} className="text-right font-semibold">
                     Custo direto total
                   </TableCell>
                   <TableCell className="text-right text-base font-bold tabular-nums">
@@ -196,12 +214,53 @@ export function CustosPanel({ ctx }: { ctx: UseAnalise }) {
               </div>
             ))}
           </div>
+          {(semCotacao.length > 0 || outrosProblemas.length > 0) && (
+            <div className="rounded-xl border-2 border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
+              <p className="font-bold">Prova dos custos — o que falta para uma diligência</p>
+              {semCotacao.length > 0 && (
+                <p className="mt-1">
+                  Sem cotação registrada: {semCotacao.map((p) => p.descricao).join("; ")}. Toque em “Cotações” na linha do
+                  insumo para anotar os preços dos fornecedores.
+                </p>
+              )}
+              {outrosProblemas.length > 0 && (
+                <ul className="mt-1 list-disc pl-5">
+                  {outrosProblemas.map((p) => (
+                    <li key={p.insumoId + p.tipo}><b>{p.descricao}:</b> {p.texto}</li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          )}
         </CardContent>
       </Card>
+
+      <CotacoesDialog
+        insumo={cotando}
+        anexos={anexos}
+        onChange={(novo) => atualizar((x) => ({ ...x, insumos: x.insumos.map((k) => (k.id === novo.id ? novo : k)) }))}
+        onClose={() => setCotandoId(null)}
+      />
 
       <PecasCard ctx={ctx} />
       <EncargosCard ctx={ctx} />
     </div>
+  );
+}
+
+function BotaoCotacoes({ insumo, onClick }: { insumo: Insumo; onClick: () => void }) {
+  const r = resumoCotacoes(insumo.cotacoes);
+  const mo = insumo.categoria === "mao_de_obra";
+  if (!r)
+    return (
+      <Button variant="outline" size="sm" onClick={onClick} className={mo ? "" : "border-amber-400 text-amber-800"}>
+        <Plus /> {mo ? "Cotar" : "Sem cotação"}
+      </Button>
+    );
+  return (
+    <Button variant="outline" size="sm" onClick={onClick} className={r.n >= 3 ? "border-emerald-500 text-emerald-800" : "border-amber-400 text-amber-800"}>
+      {r.n} cotação{r.n > 1 ? "ões" : ""}
+    </Button>
   );
 }
 
@@ -352,7 +411,7 @@ function PecasCard({ ctx }: { ctx: UseAnalise }) {
             <Plus /> Gerar {linhas.length} linha(s) na planilha
           </Button>
           <span className="text-sm text-muted-foreground">
-            Custo da peça (sem encargos e BDI):{" "}
+            Custo da peça (sem encargos e {ctx.analise.parametros.tipo === "obras" ? "BDI" : "sem despesas, tributos e lucro"}):{" "}
             {formatBRL(
               f.quantidade > 0
                 ? linhas.reduce((s, l) => s + l.quantidade * l.custoUnitario, 0) / f.quantidade

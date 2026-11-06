@@ -6,6 +6,7 @@ import type { ParametrosBDI, Tributos } from "@/lib/exequibilidade/types";
 import type { UseAnalise } from "@/hooks/use-analise-exequibilidade";
 import { formatBRL, formatPct } from "@/lib/exequibilidade/format";
 import { Campo, NumberField, SelectField } from "./fields";
+import { rotulosTaxa } from "@/lib/exequibilidade/rotulos";
 
 const CAMPOS_BDI: { chave: keyof ParametrosBDI; rotulo: string; sigla: string }[] = [
   { chave: "administracaoCentral", rotulo: "Administração central", sigla: "AC" },
@@ -33,6 +34,7 @@ export function BdiPanel({ ctx }: { ctx: UseAnalise }) {
     atualizar((x) => ({ ...x, tributos: { ...x.tributos, ...patch } }));
   const t = a.tributos;
   const d = r.decomposicao;
+  const rt = rotulosTaxa(a.parametros.tipo);
 
   return (
     <div className="grid gap-4 lg:grid-cols-2">
@@ -40,9 +42,10 @@ export function BdiPanel({ ctx }: { ctx: UseAnalise }) {
         <CardHeader>
           <CardTitle>Despesas indiretas e lucro</CardTitle>
           <CardDescription>
-            Percentuais aplicados sobre o custo direto. A fórmula é a do Acórdão TCU 2.622/2013 (obras); as faixas
-            do acórdão NÃO são obrigatórias para fornecimento de bens, servem só de referência. Use os percentuais
-            reais da empresa e guarde a memória de cálculo (despesas, folha, contabilidade) para comprovar.
+            Percentuais aplicados sobre o custo direto (o custo de fazer o uniforme). Use os percentuais reais da
+            empresa e guarde a memória de cálculo (despesas, folha, contabilidade) para comprovar.
+            {a.parametros.tipo !== "obras" &&
+              " A conta usa a mesma estrutura do BDI de obras (Acórdão TCU 2.622/2013), mas as faixas daquele acórdão não se aplicam à venda de uniformes."}
           </CardDescription>
         </CardHeader>
         <CardContent className="grid gap-4 sm:grid-cols-2">
@@ -111,22 +114,23 @@ export function BdiPanel({ ctx }: { ctx: UseAnalise }) {
       <Card className="lg:col-span-2">
         <CardHeader>
           <CardTitle className="flex flex-wrap items-center gap-2">
-            Resultado do BDI
+            {a.parametros.tipo === "obras" ? "Resultado do BDI" : rt.nome}
             {r.bdi.valido ? (
-              <Badge className="tabular-nums">BDI {formatPct(r.bdi.bdi)}</Badge>
+              <Badge className="tabular-nums">{rt.sigla} {formatPct(r.bdi.bdi)}</Badge>
             ) : (
               <Badge variant="destructive">Inválido</Badge>
             )}
           </CardTitle>
           <CardDescription>
-            BDI = [(1 + AC + S + R + G) × (1 + DF) × (1 + L) ÷ (1 − I)] − 1 (fórmula do Acórdão TCU 2.622/2013-Plenário).
+            {rt.formula}.
+            {a.parametros.tipo !== "obras" && " Em palavras simples: quanto é preciso somar ao custo do uniforme para pagar as despesas da empresa, os impostos e ainda sobrar o lucro."}
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           {!r.bdi.valido && <p className="text-sm text-red-700">{r.bdi.erro}</p>}
           <div className="grid gap-3 sm:grid-cols-3">
             <Resumo rotulo="Custo direto" valor={formatBRL(r.custos.custoDireto)} />
-            <Resumo rotulo="Preço de referência (CD × (1 + BDI))" valor={formatBRL(r.precoReferencia)} destaque />
+            <Resumo rotulo={`Preço de referência (custo direto × (1 + ${rt.sigla}))`} valor={formatBRL(r.precoReferencia)} destaque />
             <Resumo rotulo="Preço de equilíbrio (lucro zero)" valor={r.precoEquilibrio !== null ? formatBRL(r.precoEquilibrio) : "—"} />
           </div>
           <div>

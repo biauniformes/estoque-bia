@@ -41,7 +41,7 @@ export function ParametrosPanel({ ctx }: { ctx: UseAnalise }) {
         </CardHeader>
         <CardContent className="grid gap-4 sm:grid-cols-2">
           <Campo rotulo="Tipo de licitação" className="sm:col-span-2" htmlFor="tipo"
-            dica="Ao trocar o tipo, o sistema aplica o percentual legal, o BDI e os tributos de partida desse tipo (revise-os).">
+            dica="Ao trocar o tipo, o sistema aplica o percentual legal, as despesas/lucro e os tributos de partida desse tipo (revise-os).">
             <SelectField id="tipo" value={p.tipo} opcoes={OPCOES_TIPO} onChange={trocarTipo} />
           </Campo>
           <Campo rotulo="Valor estimado pela Administração" htmlFor="estimado">

@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { EmptyState, ErrorState } from "@/components/shared/states";
 import { NovaLicitacao } from "@/components/exequibilidade/nova-licitacao";
 import { StatusBadge } from "@/components/exequibilidade/status-badge";
+import { AlertaPrazos } from "@/components/exequibilidade/prazos";
 import { formatBRL } from "@/lib/exequibilidade/format";
 import { formatDataBR, progressoChecklist, rotuloStatusLicitacao } from "@/lib/exequibilidade/licitacao";
 import type { StatusExequibilidade } from "@/lib/exequibilidade/types";
@@ -45,6 +46,12 @@ export default async function ExequibilidadePage() {
             <NovaLicitacao />
           </>
         }
+      />
+
+      <AlertaPrazos
+        itens={lista
+          .filter((l) => !["perdida", "arquivada"].includes(l.status))
+          .map((l) => ({ id: l.id, titulo: l.titulo, dataSessao: l.data_sessao, prazos: Array.isArray(l.prazos) ? l.prazos : [] }))}
       />
 
       {vencendo > 0 && (

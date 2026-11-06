@@ -9,7 +9,7 @@
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
     "test:db": "tsx scripts/test-db.ts",
-    "test:exequibilidade": "tsx --test lib/exequibilidade/calc.test.ts",
+    "test:exequibilidade": "tsx --test lib/exequibilidade/calc.test.ts lib/exequibilidade/cotacoes.test.ts",
     "seed": "tsx scripts/seed.ts",
     "check": "npm run typecheck && npm run lint && npm run test:db",
     "import:itens": "tsx scripts/import-itens.ts",

@@ -7,9 +7,12 @@ const COLS_LISTA =
 
 export async function listLicitacoes() {
   const supabase = await createClient();
-  const { data, error } = await supabase.from("licitacoes").select(COLS_LISTA).order("updated_at", { ascending: false }).limit(500);
+  const q = (cols: string) => supabase.from("licitacoes").select(cols).order("updated_at", { ascending: false }).limit(500);
+  let { data, error } = await q(`${COLS_LISTA}, prazos`);
+  // Antes da migração 0019 a coluna "prazos" não existe: lista sem ela.
+  if (error && /prazos/.test(error.message)) ({ data, error } = await q(COLS_LISTA));
   if (error) throw new Error(error.message);
-  return (data ?? []) as Omit<Licitacao, "analise">[];
+  return (data ?? []) as unknown as Omit<Licitacao, "analise">[];
 }
 
 export async function getLicitacao(id: string) {

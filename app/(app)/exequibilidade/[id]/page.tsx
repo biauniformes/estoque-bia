@@ -20,6 +20,7 @@ export default async function LicitacaoPage({ params }: { params: Promise<{ id: 
       licitacao={{ id: lic.id, titulo: lic.titulo, status: lic.status, data_sessao: lic.data_sessao }}
       inicial={normalizar(lic.analise) ?? analiseVazia()}
       checklist={lic.checklist ?? {}}
+      prazos={Array.isArray(lic.prazos) ? lic.prazos : []}
       anexos={anexos}
       documentosEmpresa={documentosEmpresa}
     />

@@ -10,7 +10,7 @@ import { dbErrorToResult } from "@/lib/errors";
 import { analisar } from "@/lib/exequibilidade/calc";
 import { analiseVazia } from "@/lib/exequibilidade/defaults";
 import { normalizar } from "@/lib/exequibilidade/normalizar";
-import { CATEGORIAS_ANEXO, STATUS_LICITACAO, type Checklist } from "@/lib/exequibilidade/licitacao";
+import { CATEGORIAS_ANEXO, PRAZO_REGEX, STATUS_LICITACAO, TIPOS_PRAZO, type Checklist, type Prazo } from "@/lib/exequibilidade/licitacao";
 import type { Analise } from "@/lib/exequibilidade/types";
 import type { ActionResult } from "@/types";
 
@@ -104,6 +104,35 @@ export async function salvarChecklistAction(id: string, checklist: Checklist): P
   const supabase = await createClient();
   const { error } = await supabase.from("licitacoes").update({ checklist: limpo, updated_at: new Date().toISOString() }).eq("id", id);
   if (error) return dbErrorToResult(error);
+  return { ok: true, data: undefined };
+}
+
+const prazosSchema = z
+  .array(
+    z.object({
+      id: z.string().regex(/^[a-z0-9]{4,20}$/),
+      tipo: z.enum(TIPOS_PRAZO.map((t) => t.value) as [string, ...string[]]),
+      descricao: z.string().trim().max(200),
+      quando: z.string().regex(PRAZO_REGEX, "Informe data e hora do prazo."),
+      concluido: z.boolean(),
+    }),
+  )
+  .max(50, "Máximo de 50 prazos por licitação.");
+
+export async function salvarPrazosAction(id: string, prazos: Prazo[]): Promise<ActionResult> {
+  await requireAdmin();
+  if (!isUuid(id)) return falha("Licitação inválida.");
+  const p = prazosSchema.safeParse(prazos);
+  if (!p.success) return falha(p.error.issues[0].message);
+  const ordenados = [...p.data].sort((x, y) => x.quando.localeCompare(y.quando));
+  const supabase = await createClient();
+  const { error } = await supabase.from("licitacoes").update({ prazos: ordenados, updated_at: new Date().toISOString() }).eq("id", id);
+  if (error) {
+    if (/prazos/.test(error.message))
+      return falha("Falta atualizar o banco: rode supabase/migrations/0019_licitacao_prazos.sql no SQL Editor do Supabase.");
+    return dbErrorToResult(error);
+  }
+  refresh(id);
   return { ok: true, data: undefined };
 }
 

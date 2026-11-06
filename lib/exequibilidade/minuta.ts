@@ -6,6 +6,7 @@ import type {
 } from "@/lib/exequibilidade/types";
 import { formatBRL, formatData, formatPct } from "./format";
 import { NOMES_TIPO } from "./defaults";
+import { estatisticaCotacoes } from "./cotacoes";
 
 export const ARGUMENTOS: Record<
   ChaveArgumento,
@@ -67,10 +68,11 @@ export function gerarMinuta(a: Analise, r: ResultadoAnalise, data = new Date()):
   const p = a.parametros;
   const d = r.decomposicao;
   const avisos: string[] = [];
+  const cot = estatisticaCotacoes(a);
 
   if (r.statusEconomico === "inexequivel")
     avisos.push(
-      "A planilha aponta PREJUÍZO no preço ofertado. Uma defesa de exequibilidade com custos que não fecham pode ser indeferida e gerar responsabilização por declaração inverídica. Revise custos, BDI ou preço antes de protocolar.",
+      "A planilha aponta PREJUÍZO no preço ofertado. Uma defesa de exequibilidade com custos que não fecham pode ser indeferida e gerar responsabilização por declaração inverídica. Revise custos, despesas, lucro ou preço antes de protocolar.",
     );
   if (r.statusLegal === "acima_orcamento")
     avisos.push(
@@ -135,8 +137,14 @@ export function gerarMinuta(a: Analise, r: ResultadoAnalise, data = new Date()):
     `  • Materiais: ${formatBRL(r.custos.materiais)}`,
     `  • Equipamentos: ${formatBRL(r.custos.equipamentos)}`,
     `  • Outros custos diretos: ${formatBRL(r.custos.outros)}`,
+    ...(cot.cotacoes > 0
+      ? [
+          "",
+          `Os custos unitários de ${cot.insumos} insumo(s) estão lastreados em ${cot.cotacoes} cotação(ões) obtida(s) junto a ${cot.fornecedores} fornecedor(es), conforme quadro de cotações e documentos anexos, de modo que os valores da planilha refletem preços efetivamente praticados no mercado.`,
+        ]
+      : []),
     "",
-    `Sobre o custo direto incidem: administração central (${formatPct(a.bdi.administracaoCentral)}), seguro (${formatPct(a.bdi.seguro)}), risco (${formatPct(a.bdi.risco)}), garantia (${formatPct(a.bdi.garantia)}) e despesas financeiras (${formatPct(a.bdi.despesasFinanceiras)}), além dos tributos incidentes sobre o faturamento, que somam ${formatPct(r.bdi.somaTributos)} ${a.tributos.regime === "simples" ? `(alíquota efetiva do Simples Nacional de ${formatPct(a.tributos.simplesAliquota)}${a.tributos.outros ? ` e outros ${formatPct(a.tributos.outros)}` : ""})` : `(PIS ${formatPct(a.tributos.pis)}, COFINS ${formatPct(a.tributos.cofins)}, ISS ${formatPct(a.tributos.iss)}${a.tributos.icms ? `, ICMS ${formatPct(a.tributos.icms)}` : ""}, IRPJ ${formatPct(r.bdi.irpjEfetivo)} e CSLL ${formatPct(r.bdi.csllEfetivo)} efetivos)`}.`,
+    `Sobre o custo direto incidem: administração central (${formatPct(a.bdi.administracaoCentral)}), seguro (${formatPct(a.bdi.seguro)}), risco (${formatPct(a.bdi.risco)}), garantia (${formatPct(a.bdi.garantia)}) e despesas financeiras (${formatPct(a.bdi.despesasFinanceiras)}), além dos tributos incidentes sobre o faturamento, que somam ${formatPct(r.bdi.somaTributos)} ${a.tributos.regime === "simples" ? `(alíquota efetiva do Simples Nacional de ${formatPct(a.tributos.simplesAliquota)}${a.tributos.outros ? ` e outros ${formatPct(a.tributos.outros)}` : ""})` : `(PIS ${formatPct(a.tributos.pis)}, COFINS ${formatPct(a.tributos.cofins)}${a.tributos.iss ? `, ISS ${formatPct(a.tributos.iss)}` : ""}${a.tributos.icms ? `, ICMS ${formatPct(a.tributos.icms)}` : ""}, IRPJ ${formatPct(r.bdi.irpjEfetivo)} e CSLL ${formatPct(r.bdi.csllEfetivo)} efetivos)`}.`,
     "",
     "Demonstrativo do preço ofertado:",
     `  Custo direto ............................ ${formatBRL(d.custoDireto)}`,

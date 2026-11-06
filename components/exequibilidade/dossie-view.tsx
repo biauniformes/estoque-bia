@@ -18,6 +18,8 @@ import {
   type Checklist,
 } from "@/lib/exequibilidade/licitacao";
 import type { Analise, CategoriaInsumo } from "@/lib/exequibilidade/types";
+import { cotacoesValidas, resumoCotacoes, rotuloCriterio } from "@/lib/exequibilidade/cotacoes";
+import { rotulosTaxa } from "@/lib/exequibilidade/rotulos";
 
 const ROTULO_CAT: Record<CategoriaInsumo, string> = {
   mao_de_obra: "Mão de obra (com encargos sociais)",
@@ -53,6 +55,12 @@ export function DossieView({
   const id = a.identificacao;
   const d = r.decomposicao;
   const indice = [...anexos, ...documentosEmpresa];
+  const rt = rotulosTaxa(a.parametros.tipo);
+  const comCotacao = a.insumos.filter((i) => cotacoesValidas(i.cotacoes).length > 0);
+  const numAnexo = (anexoId: string | null) => {
+    const k = anexoId ? indice.findIndex((x) => x.id === anexoId) : -1;
+    return k >= 0 ? `Anexo nº ${k + 1}` : "—";
+  };
 
   return (
     <div className="mx-auto max-w-4xl">
@@ -90,7 +98,7 @@ export function DossieView({
             <ol className="list-decimal pl-5">
               <li>Resumo do preço e conclusão</li>
               <li>Planilha de custos e formação de preços</li>
-              <li>BDI, tributos e composição do preço</li>
+              <li>{a.parametros.tipo === "obras" ? "BDI, tributos e composição do preço" : "Despesas, tributos, lucro e composição do preço"}</li>
               <li>Análise de exequibilidade</li>
               <li>Defesa de exequibilidade</li>
               <li>Habilitação e documentos</li>
@@ -162,6 +170,38 @@ export function DossieView({
             })
           )}
           <p className="font-bold">Custo direto total: {formatBRL(r.custos.custoDireto)}</p>
+          {comCotacao.length > 0 && (
+            <>
+              <h3>Quadro de cotações (origem dos custos unitários)</h3>
+              {comCotacao.map((i) => {
+                const rc = resumoCotacoes(i.cotacoes)!;
+                return (
+                  <table key={i.id} className="mb-3 break-inside-avoid">
+                    <thead>
+                      <tr><th colSpan={4}>{i.descricao || "—"} — preço por {i.unidade}</th></tr>
+                      <tr><th>Fornecedor</th><th>Data</th><th className="text-right">Preço</th><th>Documento</th></tr>
+                    </thead>
+                    <tbody>
+                      {cotacoesValidas(i.cotacoes).map((c) => (
+                        <tr key={c.id}>
+                          <td>{c.fornecedor || "—"}</td>
+                          <td>{formatDataBR(c.data)}</td>
+                          <td className="text-right tabular-nums">{formatBRL(c.valor)}</td>
+                          <td>{numAnexo(c.anexoId)}</td>
+                        </tr>
+                      ))}
+                      <tr>
+                        <td colSpan={4} className="text-[11px]">
+                          Menor {formatBRL(rc.menor)} · mediana {formatBRL(rc.mediana)} · média {formatBRL(rc.media)} · maior {formatBRL(rc.maior)} —{" "}
+                          <b>custo adotado na planilha: {formatBRL(i.custoUnitario)} ({rotuloCriterio(i.criterioCotacao)})</b>
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                );
+              })}
+            </>
+          )}
           {r.custos.maoDeObra > 0 && (
             <>
               <h3>Encargos sociais ({a.encargos.modo === "manual" ? "informado" : "detalhado"}: {formatPct(r.encargos.total)})</h3>
@@ -181,7 +221,7 @@ export function DossieView({
 
         {/* 3. BDI */}
         <section className={SECAO}>
-          <h2>3. BDI, tributos e composição do preço</h2>
+          <h2>3. {a.parametros.tipo === "obras" ? "BDI, tributos e composição do preço" : "Despesas, tributos, lucro e composição do preço"}</h2>
           <table>
             <thead><tr><th>Componente</th><th className="text-right">%</th></tr></thead>
             <tbody>
@@ -204,8 +244,8 @@ export function DossieView({
             </tbody>
           </table>
           <p className="mt-2">
-            BDI = [(1 + AC + S + R + G) × (1 + DF) × (1 + L) ÷ (1 − I)] − 1 = <b>{r.bdi.valido ? formatPct(r.bdi.bdi) : "inválido"}</b>
-            {" "}(fórmula do Acórdão TCU 2.622/2013-Plenário). Preço de referência (custo direto × (1 + BDI)): {formatBRL(r.precoReferencia)}.
+            {rt.nome}: <b>{r.bdi.valido ? formatPct(r.bdi.bdi) : "inválido"}</b>. {rt.formula}. Preço de referência
+            (custo direto × (1 + {rt.sigla})): {formatBRL(r.precoReferencia)}.
           </p>
           <h3>Composição do preço ofertado</h3>
           <table>

@@ -12,6 +12,7 @@ import type {
   StatusExequibilidade,
   Tributos,
 } from "@/lib/exequibilidade/types";
+import { problemasCotacoes } from "./cotacoes";
 
 export const round2 = (n: number): number =>
   Math.round((n + Number.EPSILON) * 100) / 100;
@@ -265,6 +266,12 @@ export function analisar(a: Analise): ResultadoAnalise {
   )
     avisos.push(
       "Simples Nacional: INSS patronal e contribuições ao Sistema S (salário-educação, SESI/SENAI, INCRA, SEBRAE) costumam estar dentro do DAS nos anexos I a III. Se for o seu caso, zere esses itens nos encargos para não contar duas vezes (confirme com o contador).",
+    );
+
+  const semProva = problemasCotacoes(a).filter((x) => x.tipo === "abaixo_menor");
+  if (semProva.length)
+    avisos.push(
+      `Custo abaixo da menor cotação registrada em: ${semProva.map((x) => x.descricao).join("; ")}. Use o valor cotado ou anexe outra prova (nota fiscal, contrato) desse preço.`,
     );
 
   const E = num(p.valorEstimado);

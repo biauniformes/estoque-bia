@@ -178,6 +178,19 @@ export function analiseVazia(tipo: TipoLicitacao = "fornecimento"): Analise {
   };
 }
 
+/** Cotações fictícias do exemplo: [fornecedor, dias atrás, preço]. */
+function comCotacoes(i: Insumo, cs: [string, number, number][]): Insumo {
+  const dia = (atras: number) => {
+    const d = new Date(Date.now() - atras * 86400000);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  };
+  return {
+    ...i,
+    criterioCotacao: "menor",
+    cotacoes: cs.map(([fornecedor, atras, valor]) => ({ id: novoId(), fornecedor, data: dia(atras), valor, anexoId: null })),
+  };
+}
+
 export function exemplo(): Analise {
   const base = analiseVazia("fornecimento");
   const ins = (
@@ -213,11 +226,19 @@ export function exemplo(): Analise {
       precoOfertado: 330_000,
     },
     insumos: [
-      ins("Camiseta — malha PV (com perda)", "material", "m", 2000 * 0.9 * 1.08, 18.5),
+      comCotacoes(ins("Camiseta — malha PV (com perda)", "material", "m", 2000 * 0.9 * 1.08, 18.5), [
+        ["Malharia Exemplo A", 5, 18.5],
+        ["Malharia Exemplo B", 8, 19.2],
+        ["Distribuidora Exemplo C", 12, 21],
+      ]),
       ins("Camiseta — aviamentos", "material", "un", 2000, 1.2),
       ins("Camiseta — corte, costura e acabamento", "mao_de_obra", "h", (2000 * 12) / 60, 9.5),
       ins("Camiseta — serigrafia", "outros", "un", 2000, 2.8),
-      ins("Bermuda — tecido tactel (com perda)", "material", "m", 1500 * 1.1 * 1.08, 21),
+      comCotacoes(ins("Bermuda — tecido tactel (com perda)", "material", "m", 1500 * 1.1 * 1.08, 21), [
+        ["Tecelagem Exemplo D", 3, 21],
+        ["Malharia Exemplo A", 5, 22.4],
+        ["Distribuidora Exemplo C", 12, 23.1],
+      ]),
       ins("Bermuda — aviamentos", "material", "un", 1500, 3.4),
       ins("Bermuda — corte, costura e acabamento", "mao_de_obra", "h", (1500 * 25) / 60, 9.5),
       ins("Jaqueta — tecido e forro (com perda)", "material", "m", 800 * 2.2 * 1.08, 26),
