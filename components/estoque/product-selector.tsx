@@ -18,6 +18,9 @@ export function groupProducts(variants: StockRow[]): ProductOption[] {
   return [...map.values()]; // já vem ordenado pelo banco (modelo e depois tamanho: PP, P, M, G, GG…)
 }
 
+/** Cada tamanho é um produto próprio no catálogo: com poucos resultados, os primeiros modelos escondiam os demais. */
+const MAX_RESULTADOS = 80;
+
 const norm = (s: string) => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
 
 /** Busca com autocomplete ("jaqueta" → Jaqueta Operacional). Com o campo vazio lista os produtos para toque rápido. */
@@ -42,7 +45,7 @@ export function ProductSelector({
         const hay = norm(`${p.nome} ${p.codigo} ${categoryLabel(p.categoria)} ${p.variants.map((v) => v.sku).join(" ")}`);
         return tokens.every((t) => hay.includes(t));
       })
-      .slice(0, 12);
+      .slice(0, MAX_RESULTADOS);
   }, [q, products]);
 
   if (selected) {
@@ -83,7 +86,7 @@ export function ProductSelector({
           className="h-14 w-full rounded-2xl border-2 border-slate-300 bg-white pl-12 pr-4 text-lg placeholder:text-slate-400 focus-visible:border-brand focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-orange-200"
         />
       </div>
-      <ul className="mt-2 grid gap-2 sm:grid-cols-2" role="listbox" aria-label="Produtos encontrados">
+      <ul className="mt-2 grid max-h-[32rem] gap-2 overflow-y-auto sm:grid-cols-2" role="listbox" aria-label="Produtos encontrados">
         {matches.map((p) => (
           <li key={p.id} role="option" aria-selected={false}>
             <button

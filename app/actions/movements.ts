@@ -110,6 +110,87 @@ export async function correctMovementAction(input: {
   return { ok: true, data: data as MovementResult };
 }
 
+const entradaLoteSchema = z.object({
+  motivo: z.enum(["producao", "compra", "devolucao", "ajuste_positivo", "outros"], { error: "Selecione o motivo." }),
+  key: z.string().min(8).max(100),
+  observacao: z.string().trim().max(500, "Observação muito longa (máx. 500).").default(""),
+  items: z
+    .array(
+      z.object({
+        variantId: z.string().uuid(),
+        quantidade: z.number().int().min(1, "A quantidade de cada peça deve ser maior que zero.").max(1_000_000, "Quantidade acima do limite."),
+      }),
+    )
+    .min(1, "Adicione ao menos uma peça.")
+    .max(300, "No máximo 300 itens por entrada."),
+});
+
+export type EntradaLoteResult = {
+  lancados: number;
+  repetidos: number;
+  pecas: number;
+  itens: { variant_id: string; estoque_posterior: number }[];
+};
+
+/**
+ * Entrada de várias peças de uma vez (qualquer usuário, menos Expedição e Corte).
+ * Cada peça vira uma entrada normal com chave própria (lote + peça): reenviar o mesmo lote
+ * (duplo clique, queda de rede) não lança nada em dobro. Se algo falhar no meio, o erro devolve
+ * quais peças já foram lançadas para a tela tirá-las da lista.
+ */
+export async function registerEntradaLoteAction(input: {
+  motivo: "producao" | "compra" | "devolucao" | "ajuste_positivo" | "outros";
+  key: string;
+  observacao?: string;
+  items: { variantId: string; quantidade: number }[];
+}): Promise<ActionResult<EntradaLoteResult> & { lancadosParcial?: string[] }> {
+  const profile = await requireUser();
+  if (profile.role === "expedicao") return { ok: false, error: "O perfil Expedição só pode fazer saída por OC.", code: "SEM_PERMISSAO" };
+  if (profile.role === "corte") return { ok: false, error: "O perfil Corte só pode consultar o estoque.", code: "SEM_PERMISSAO" };
+  const parsed = entradaLoteSchema.safeParse(input);
+  if (!parsed.success) return { ok: false, error: parsed.error.issues[0].message, code: "VALIDACAO" };
+  const v = parsed.data;
+  if (new Set(v.items.map((i) => i.variantId)).size !== v.items.length) {
+    return { ok: false, error: "Há peças repetidas na lista.", code: "VALIDACAO" };
+  }
+
+  const supabase = await createClient();
+  const meta = await getRequestMeta();
+  const feitos: EntradaLoteResult["itens"] = [];
+  let lancados = 0;
+  let repetidos = 0;
+  let pecas = 0;
+  for (const it of v.items) {
+    const { data, error } = await supabase.rpc("register_movement", {
+      p_variant_id: it.variantId,
+      p_tipo: "entrada",
+      p_quantidade: it.quantidade,
+      p_motivo: v.motivo,
+      p_oc: null,
+      p_observacao: v.observacao || null,
+      p_idempotency_key: `${v.key}:${it.variantId}`.slice(0, 100),
+      p_ip: meta.ip,
+      p_ua: meta.ua,
+    });
+    if (error) {
+      const result = dbErrorToResult(error);
+      await logInvalid(supabase, meta, { lote_entrada: v.items.length, variant_id: it.variantId, erro: result.code ?? "ERRO", mensagem: result.error });
+      if (feitos.length) refresh();
+      const aviso = feitos.length ? ` ${feitos.length} peça(s) anterior(es) já foram lançadas e saíram da lista; corrija e confirme de novo.` : "";
+      return { ...result, error: result.error + aviso, lancadosParcial: feitos.map((f) => f.variant_id) } as ActionResult<EntradaLoteResult> & { lancadosParcial?: string[] };
+    }
+    const r = data as MovementResult;
+    if (r.duplicado) repetidos++;
+    else {
+      lancados++;
+      pecas += it.quantidade;
+    }
+    feitos.push({ variant_id: it.variantId, estoque_posterior: r.estoque_posterior });
+  }
+  refresh();
+  return { ok: true, data: { lancados, repetidos, pecas, itens: feitos } };
+}
+
 const countSchema = z.object({
   key: z.string().min(8).max(100),
   items: z
