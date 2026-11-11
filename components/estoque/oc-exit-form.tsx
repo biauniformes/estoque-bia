@@ -44,7 +44,7 @@ function FilterChip({ active, onClick, children }: { active: boolean; onClick: (
   );
 }
 
-export function OcExitForm({ variants, isAdmin, initialVariantId }: { variants: StockRow[]; isAdmin: boolean; initialVariantId?: string }) {
+export function OcExitForm({ variants, isAdmin, podeAjuste, initialVariantId }: { variants: StockRow[]; isAdmin: boolean; podeAjuste: boolean; initialVariantId?: string }) {
   const router = useRouter();
   const [oc, setOc] = React.useState("");
   // administrador: saída para uma OC ou saída sem OC (ajuste, perda, avaria…)
@@ -194,7 +194,7 @@ export function OcExitForm({ variants, isAdmin, initialVariantId }: { variants: 
   const semQtd = rows.filter((r) => r.n < 1).length;
   const faltando = rows.filter((r) => r.n > stockOf(r.v));
   const blocker =
-    !ocClean && !isAdmin ? "Informe o número da OC" : rows.length === 0 ? "Adicione ao menos uma peça" : semQtd > 0 ? "Preencha a quantidade de todas as peças" : faltando.length > 0 ? "Há peças sem estoque suficiente" : null;
+    modo === "oc" && !ocClean && !isAdmin ? "Informe o número da OC" : rows.length === 0 ? "Adicione ao menos uma peça" : semQtd > 0 ? "Preencha a quantidade de todas as peças" : faltando.length > 0 ? "Há peças sem estoque suficiente" : null;
 
   async function submit() {
     if (lock.current || blocker) return;
@@ -280,7 +280,7 @@ export function OcExitForm({ variants, isAdmin, initialVariantId }: { variants: 
   return (
     <div className="mx-auto max-w-5xl space-y-6 pb-32">
       <Card className="p-5">
-        {isAdmin && (
+        {podeAjuste && (
           <div className="mb-4">
             <p className="mb-1.5 text-sm font-extrabold uppercase tracking-wide text-slate-700">Tipo de saída</p>
             <div role="radiogroup" aria-label="Tipo de saída" className="flex flex-wrap gap-3">
@@ -580,7 +580,7 @@ export function OcExitForm({ variants, isAdmin, initialVariantId }: { variants: 
               </p>
             )}
             <p className="text-lg font-extrabold tabular-nums">
-              {ocClean ? `OC ${ocClean} · ` : isAdmin ? "Sem OC · " : ""}
+              {ocClean ? `OC ${ocClean} · ` : isAdmin || modo === "ajuste" ? "Sem OC · " : ""}
               {formatNumber(rows.length)} {rows.length === 1 ? "peça" : "peças diferentes"} · {formatNumber(pecas)} un.
             </p>
             {blocker && rows.length + oc.length > 0 && <p className="text-sm text-slate-500">{blocker}</p>}

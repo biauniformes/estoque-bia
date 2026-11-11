@@ -17,10 +17,12 @@ export default async function SaidaOcPage({ searchParams }: { searchParams: Prom
         description={
           profile.role === "admin"
             ? "Adicione todas as peças e quantidades e confirme de uma só vez. O número da OC é opcional para administradores."
-            : "Informe a OC uma vez, adicione todas as peças e quantidades e confirme de uma só vez."
+            : profile.role === "expedicao"
+              ? "Informe a OC uma vez, adicione todas as peças e quantidades e confirme de uma só vez."
+              : "Informe a OC (ou escolha Ajuste, perda, avaria), adicione as peças e quantidades e confirme de uma só vez."
         }
       />
-      <OcExitForm variants={variants} isAdmin={profile.role === "admin"} initialVariantId={first(sp.variant)} />
+      <OcExitForm variants={variants} isAdmin={profile.role === "admin"} podeAjuste={profile.role !== "expedicao"} initialVariantId={first(sp.variant)} />
     </>
   );
 }

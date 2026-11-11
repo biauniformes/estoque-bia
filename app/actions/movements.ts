@@ -275,8 +275,8 @@ export async function registerOcExitAction(input: {
   }
   const v = parsed.data;
   const oc = normalizeOc(v.oc);
-  // OC é obrigatória para quem não é administrador (o banco também exige); admin pode deixar em branco
-  if (!oc && profile.role !== "admin") {
+  // sem OC (ajuste, perda, avaria…): administrador e operador; Expedição só com OC (o banco também exige)
+  if (!oc && profile.role === "expedicao") {
     return { ok: false, error: "Informe o número da OC.", code: "OC_OBRIGATORIA", fieldErrors: { oc: "Informe o número da OC." } };
   }
   if (oc && !/^[A-Z0-9./-]{1,20}$/.test(oc)) {
