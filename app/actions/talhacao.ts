@@ -25,7 +25,7 @@ const lancamentoSchema = z.object({
 
 async function guard() {
   const profile = await requireUser();
-  if (profile.role === "expedicao") return { profile, error: { ok: false as const, error: "Seu perfil não tem acesso à Talhação.", code: "SEM_PERMISSAO" } };
+  if (profile.role === "expedicao" || profile.role === "operator") return { profile, error: { ok: false as const, error: "Seu perfil não tem acesso à Talhação.", code: "SEM_PERMISSAO" } };
   return { profile, error: null };
 }
 

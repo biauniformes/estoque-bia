@@ -16,7 +16,7 @@ export const metadata = { title: "Para talhar" };
 
 export default async function TalharPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const profile = await requireUser();
-  if (profile.role === "expedicao") redirect("/");
+  if (profile.role === "expedicao" || profile.role === "operator") redirect("/");
   const sp = await searchParams;
   const grupoSel = GRUPOS_TALHAR.find((g) => g.id === first(sp.grupo))?.id ?? "";
   const mostrarTodos = first(sp.todos) === "1";

@@ -72,6 +72,8 @@ function NavList({ role, onNavigate }: { role: Role; onNavigate?: () => void }) 
     .filter((i) => !(role === "admin" && i.href === "/"))
     .filter((i) => role !== "expedicao" || EXPEDICAO.includes(i.href))
     .filter((i) => role !== "corte" || CORTE.includes(i.href))
+    // operador de estoque: sem Consolidação de OC e sem Talhação
+    .filter((i) => role !== "operator" || !["/consolidacao", "/talhar", "/talhacao", "/talhacao/historico"].includes(i.href))
     .filter((i) => i.href !== "/talhar" || role !== "expedicao")
     // admin/operador: um botão só (Talhação) com as abas Para talhar e Histórico; o lançamento fica para o perfil Corte
     .filter((i) => role === "corte" ? true : i.href !== "/talhacao" && i.href !== "/talhacao/historico")

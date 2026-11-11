@@ -27,7 +27,7 @@ type Linha = {
 
 export default async function TalhacaoPage() {
   const profile = await requireUser();
-  if (profile.role === "expedicao") redirect("/");
+  if (profile.role === "expedicao" || profile.role === "operator") redirect("/");
 
   const hoje = new Intl.DateTimeFormat("sv-SE", { timeZone: "America/Sao_Paulo" }).format(new Date());
   const supabase = await createClient();

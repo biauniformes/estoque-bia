@@ -12,8 +12,8 @@ export const dynamic = "force-dynamic";
 
 export default async function ConsolidacaoPage() {
   const profile = await requireUser();
-  if (profile.role === "corte") redirect("/");
-  const canWrite = profile.role === "admin" || profile.role === "operator";
+  if (profile.role === "corte" || profile.role === "operator") redirect("/");
+  const canWrite = profile.role === "admin";
   const { ordens } = await carregarConsolidacao();
 
   return (

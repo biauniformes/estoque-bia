@@ -33,8 +33,8 @@ function refresh() {
 
 async function podeEscrever() {
   const profile = await requireUser();
-  if (profile.role !== "admin" && profile.role !== "operator") {
-    return { profile, erro: { ok: false as const, error: "Só administrador e operador alteram a consolidação de OC.", code: "SEM_PERMISSAO" } };
+  if (profile.role !== "admin") {
+    return { profile, erro: { ok: false as const, error: "Só o administrador altera a consolidação de OC.", code: "SEM_PERMISSAO" } };
   }
   return { profile, erro: null };
 }

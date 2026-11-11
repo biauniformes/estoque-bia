@@ -11,7 +11,7 @@ export const dynamic = "force-dynamic";
 
 export default async function LigacoesPage() {
   const profile = await requireUser();
-  if (profile.role !== "admin" && profile.role !== "operator") redirect("/consolidacao");
+  if (profile.role !== "admin") redirect("/consolidacao");
   const { ordens, ligacoes, modelosLista } = await carregarConsolidacao();
 
   const pendentesPorCod: Record<string, number> = {};
