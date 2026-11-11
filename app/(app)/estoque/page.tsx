@@ -97,7 +97,7 @@ export default async function EstoquePage({ searchParams }: { searchParams: Prom
             </Link>
           </Button>
           <Button asChild size="sm" variant="saida" aria-label={`Saída de ${r.produto}`}>
-            <Link href={`/saida?variant=${r.variant_id}`}>
+            <Link href={`/saida-oc?variant=${r.variant_id}`}>
               <MinusCircle className="h-4 w-4" aria-hidden /> Saída
             </Link>
           </Button>

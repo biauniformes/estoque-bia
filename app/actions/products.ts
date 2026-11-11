@@ -24,7 +24,7 @@ const fail = (issues: { path: PropertyKey[]; message: string }[]): FormState => 
 });
 
 function refresh() {
-  for (const p of ["/produtos", "/estoque", "/entrada", "/saida", "/dashboard"]) revalidatePath(p);
+  for (const p of ["/produtos", "/estoque", "/entrada", "/saida-oc", "/dashboard"]) revalidatePath(p);
 }
 
 /** Cria (sem id) ou edita (com id) um produto. Na criação pode incluir a primeira variação. */

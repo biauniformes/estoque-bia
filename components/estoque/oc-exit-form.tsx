@@ -44,12 +44,16 @@ function FilterChip({ active, onClick, children }: { active: boolean; onClick: (
   );
 }
 
-export function OcExitForm({ variants, isAdmin }: { variants: StockRow[]; isAdmin: boolean }) {
+export function OcExitForm({ variants, isAdmin, initialVariantId }: { variants: StockRow[]; isAdmin: boolean; initialVariantId?: string }) {
   const router = useRouter();
   const [oc, setOc] = React.useState("");
+  // administrador: saída para uma OC ou saída sem OC (ajuste, perda, avaria…)
+  const [modo, setModo] = React.useState<"oc" | "ajuste">("oc");
   const [motivo, setMotivo] = React.useState<"producao" | "perda" | "avaria" | "ajuste_negativo" | "outros">("outros");
   const [obs, setObs] = React.useState("");
-  const [lines, setLines] = React.useState<Line[]>([]);
+  const [lines, setLines] = React.useState<Line[]>(() =>
+    initialVariantId && variants.some((v) => v.variant_id === initialVariantId) ? [{ id: initialVariantId, qty: "" }] : [],
+  );
   const [search, setSearch] = React.useState("");
   const [empresa, setEmpresa] = React.useState<string>("");
   const [secao, setSecao] = React.useState<string>("");
@@ -181,7 +185,8 @@ export function OcExitForm({ variants, isAdmin }: { variants: StockRow[]; isAdmi
   }
 
   // ---- totais e conferência
-  const ocClean = normalizeOc(oc);
+  const ocEfetiva = modo === "ajuste" ? "" : oc;
+  const ocClean = normalizeOc(ocEfetiva);
   const rows = lines
     .map((l) => ({ ...l, v: byId.get(l.id)!, n: parseInt(l.qty || "0", 10) || 0 }))
     .filter((l) => l.v);
@@ -199,7 +204,7 @@ export function OcExitForm({ variants, isAdmin }: { variants: StockRow[]; isAdmi
     setOcError(null);
     try {
       const res = await registerOcExitAction({
-        oc,
+        oc: ocEfetiva,
         motivo,
         key: keyRef.current,
         observacao: obs,
@@ -255,7 +260,7 @@ export function OcExitForm({ variants, isAdmin }: { variants: StockRow[]; isAdmi
         )}
         <div className="mt-8 grid gap-3 sm:grid-cols-2">
           <Button size="lg" variant="outline" onClick={reset}>
-            Nova saída por OC
+            Nova saída
           </Button>
           {isAdmin && result.oc ? (
             <Button size="lg" asChild>
@@ -275,43 +280,101 @@ export function OcExitForm({ variants, isAdmin }: { variants: StockRow[]; isAdmi
   return (
     <div className="mx-auto max-w-5xl space-y-6 pb-32">
       <Card className="p-5">
-        <label htmlFor="oc" className="mb-1.5 block text-sm font-extrabold uppercase tracking-wide text-slate-700">
-          Número da OC {isAdmin ? <span className="font-semibold normal-case tracking-normal text-slate-500">(opcional para administrador)</span> : <span className="text-red-600">*</span>}
-        </label>
-        <div className="flex items-center gap-2">
-          <span className="flex h-16 items-center rounded-2xl bg-slate-900 px-5 text-2xl font-extrabold text-white">OC</span>
-          <Input
-            id="oc"
-            value={oc}
-            onChange={(e) => {
-              touch();
-              setOcError(null);
-              setOc(e.target.value.replace(/^\s*oc[\s._-]*/i, "").toUpperCase());
-            }}
-            placeholder="22"
-            autoComplete="off"
-            maxLength={20}
-            aria-invalid={!!ocError || undefined}
-            className="h-16 text-2xl font-bold"
-          />
-        </div>
-        {ocError && <p className="mt-1 text-sm font-medium text-red-600">{ocError}</p>}
-        {isAdmin && !ocClean ? (
-          <div className="mt-3">
-            <label htmlFor="motivo" className="mb-1.5 block text-sm font-bold text-slate-700">Motivo da saída (sem OC)</label>
-            <select
-              id="motivo"
-              value={motivo}
-              onChange={(e) => { touch(); setMotivo(e.target.value as typeof motivo); }}
-              className="h-12 w-full rounded-xl border-2 border-slate-300 bg-white px-4 text-base sm:w-72"
-            >
-              {(["outros", "producao", "perda", "avaria", "ajuste_negativo"] as const).map((m) => (
-                <option key={m} value={m}>{REASON_LABELS[m]}</option>
+        {isAdmin && (
+          <div className="mb-4">
+            <p className="mb-1.5 text-sm font-extrabold uppercase tracking-wide text-slate-700">Tipo de saída</p>
+            <div role="radiogroup" aria-label="Tipo de saída" className="flex flex-wrap gap-3">
+              {(
+                [
+                  ["oc", "Saída para OC"],
+                  ["ajuste", "Ajuste, perda, avaria e outros"],
+                ] as const
+              ).map(([v, rotulo]) => (
+                <button
+                  key={v}
+                  type="button"
+                  role="radio"
+                  aria-checked={modo === v}
+                  onClick={() => {
+                    touch();
+                    setModo(v);
+                    setOcError(null);
+                    if (v === "ajuste" && motivo === "outros") setMotivo("ajuste_negativo");
+                  }}
+                  className={cn(
+                    "min-h-14 rounded-2xl border-2 px-5 text-lg font-bold transition-colors active:scale-95",
+                    modo === v ? "border-brand bg-brand text-black" : "border-slate-300 bg-white text-slate-800 hover:border-brand hover:bg-orange-50",
+                  )}
+                >
+                  {rotulo}
+                </button>
               ))}
-            </select>
+            </div>
           </div>
+        )}
+        {modo === "oc" ? (
+          <>
+            <label htmlFor="oc" className="mb-1.5 block text-sm font-extrabold uppercase tracking-wide text-slate-700">
+              Número da OC {isAdmin ? <span className="font-semibold normal-case tracking-normal text-slate-500">(opcional para administrador)</span> : <span className="text-red-600">*</span>}
+            </label>
+            <div className="flex items-center gap-2">
+              <span className="flex h-16 items-center rounded-2xl bg-slate-900 px-5 text-2xl font-extrabold text-white">OC</span>
+              <Input
+                id="oc"
+                value={oc}
+                onChange={(e) => {
+                  touch();
+                  setOcError(null);
+                  setOc(e.target.value.replace(/^\s*oc[\s._-]*/i, "").toUpperCase());
+                }}
+                placeholder="22"
+                autoComplete="off"
+                maxLength={20}
+                aria-invalid={!!ocError || undefined}
+                className="h-16 text-2xl font-bold"
+              />
+            </div>
+            {ocError && <p className="mt-1 text-sm font-medium text-red-600">{ocError}</p>}
+            {isAdmin && !ocClean ? (
+              <div className="mt-3">
+                <label htmlFor="motivo" className="mb-1.5 block text-sm font-bold text-slate-700">Motivo da saída (sem OC)</label>
+                <select
+                  id="motivo"
+                  value={motivo}
+                  onChange={(e) => { touch(); setMotivo(e.target.value as typeof motivo); }}
+                  className="h-12 w-full rounded-xl border-2 border-slate-300 bg-white px-4 text-base sm:w-72"
+                >
+                  {(["outros", "producao", "perda", "avaria", "ajuste_negativo"] as const).map((m) => (
+                    <option key={m} value={m}>{REASON_LABELS[m]}</option>
+                  ))}
+                </select>
+              </div>
+            ) : (
+              <p className="mt-1 text-sm text-slate-500">Todas as peças abaixo saem para esta OC.</p>
+            )}
+          </>
         ) : (
-          <p className="mt-1 text-sm text-slate-500">Todas as peças abaixo saem para esta OC.</p>
+          <div>
+            <p className="mb-1.5 text-sm font-extrabold uppercase tracking-wide text-slate-700">Motivo da saída</p>
+            <div role="radiogroup" aria-label="Motivo da saída" className="flex flex-wrap gap-3">
+              {(["ajuste_negativo", "perda", "avaria", "producao", "outros"] as const).map((m) => (
+                <button
+                  key={m}
+                  type="button"
+                  role="radio"
+                  aria-checked={motivo === m}
+                  onClick={() => { touch(); setMotivo(m); }}
+                  className={cn(
+                    "min-h-14 min-w-16 rounded-2xl border-2 px-5 text-lg font-bold transition-colors active:scale-95",
+                    motivo === m ? "border-brand bg-brand text-black" : "border-slate-300 bg-white text-slate-800 hover:border-brand hover:bg-orange-50",
+                  )}
+                >
+                  {REASON_LABELS[m]}
+                </button>
+              ))}
+            </div>
+            <p className="mt-2 text-sm text-slate-500">Sem número de OC. Descreva o motivo na observação, se precisar.</p>
+          </div>
         )}
       </Card>
 

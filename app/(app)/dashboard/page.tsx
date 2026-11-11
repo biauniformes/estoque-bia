@@ -40,7 +40,7 @@ export default async function DashboardPage() {
         actions={
           <>
             <Button asChild variant="entrada" size="lg"><Link href="/entrada"><PlusCircle className="h-5 w-5" aria-hidden /> Entrada</Link></Button>
-            <Button asChild variant="saida" size="lg"><Link href="/saida"><MinusCircle className="h-5 w-5" aria-hidden /> Saída</Link></Button>
+            <Button asChild variant="saida" size="lg"><Link href="/saida-oc"><MinusCircle className="h-5 w-5" aria-hidden /> Saída</Link></Button>
           </>
         }
       />

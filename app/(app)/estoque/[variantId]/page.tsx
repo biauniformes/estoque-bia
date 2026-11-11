@@ -38,7 +38,7 @@ export default async function VariantDetailPage({ params }: { params: Promise<{ 
               <Link href={`/entrada?variant=${row.variant_id}`}><PlusCircle className="h-5 w-5" aria-hidden /> Entrada</Link>
             </Button>
             <Button asChild variant="saida" size="lg">
-              <Link href={`/saida?variant=${row.variant_id}`}><MinusCircle className="h-5 w-5" aria-hidden /> Saída</Link>
+              <Link href={`/saida-oc?variant=${row.variant_id}`}><MinusCircle className="h-5 w-5" aria-hidden /> Saída</Link>
             </Button>
           </>
         }
