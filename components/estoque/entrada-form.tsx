@@ -10,28 +10,18 @@ import { Textarea } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { registerEntradaLoteAction, type EntradaLoteResult } from "@/app/actions/movements";
 import { ENTRADA_REASONS } from "@/lib/constants";
-import { cn, formatNumber, newKey, variantLabel } from "@/lib/utils";
+import { cn, formatNumber, newKey } from "@/lib/utils";
 import { EMPRESAS, SEM_EMPRESA, empresaDe, empresaLabel } from "@/lib/empresas";
 import { SECOES, secaoDe } from "@/lib/secoes";
+import { agruparPorModelo, filtrarPorTexto, tamanhoDe, type GrupoModelo } from "@/lib/modelos";
 import type { StockRow } from "@/types";
 
 type Line = { id: string; qty: string };
 type Motivo = (typeof ENTRADA_REASONS)[number]["value"];
-type Grupo = { prefixo: string; nome: string; itens: StockRow[] };
+type Grupo = GrupoModelo;
 
 const EMPRESA_CHIPS = [...EMPRESAS, SEM_EMPRESA] as const;
 const MAX_GRUPOS = 30;
-
-const norm = (s: string) => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
-
-/** "NNN.NNN" do código: identifica o modelo (todos os tamanhos dele). */
-const prefixoDe = (codigo: string) => codigo.split(".").slice(0, 2).join(".");
-
-/** Rótulo curto do tamanho: o que sobra do nome depois do nome-base ("… AZUL PP" → "PP"). */
-function tamanhoDe(v: StockRow, base: string) {
-  const resto = v.produto.startsWith(base) ? v.produto.slice(base.length).trim() : v.produto;
-  return resto || variantLabel(v.cor, v.tamanho) || "Único";
-}
 
 /** "100.301.00 20" / "100.301.00;20" / "100.301.00<TAB>20" / "100.301.00 x 20" → {code, qty} */
 function parseLine(line: string): { code: string; qty: number } | null {
@@ -99,22 +89,11 @@ export function EntradaForm({ variants, initialVariantId }: { variants: StockRow
   /** Resultados agrupados por modelo: todos os tamanhos de cada modelo juntos, sem corte por quantidade de peças. */
   const grupos = React.useMemo<Grupo[]>(() => {
     if (!listOpen) return [];
-    const tokens = norm(search.trim()).split(/\s+/).filter(Boolean);
-    const map = new Map<string, Grupo>();
-    for (const v of variants) {
+    const filtrados = filtrarPorTexto(variants, search).filter((v) => {
       const t = tags.get(v.variant_id)!;
-      if (empresa && t.empresa !== empresa) continue;
-      if (secao && t.secao !== secao) continue;
-      if (tokens.length) {
-        const hay = norm(`${v.produto} ${v.codigo} ${v.sku}`);
-        if (!tokens.every((tk) => hay.includes(tk))) continue;
-      }
-      const p = prefixoDe(v.codigo);
-      const g = map.get(p) ?? { prefixo: p, nome: v.nome_base || v.produto, itens: [] };
-      g.itens.push(v);
-      map.set(p, g);
-    }
-    return [...map.values()];
+      return (!empresa || t.empresa === empresa) && (!secao || t.secao === secao);
+    });
+    return agruparPorModelo(filtrados);
   }, [listOpen, search, empresa, secao, variants, tags]);
   const gruposVisiveis = grupos.slice(0, MAX_GRUPOS);
   const totalItens = grupos.reduce((s, g) => s + g.itens.length, 0);

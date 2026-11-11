@@ -3,7 +3,8 @@
 import * as React from "react";
 import { Check, Search, X } from "lucide-react";
 import { categoryLabel } from "@/lib/constants";
-import { cn } from "@/lib/utils";
+import { agruparPorModelo, filtrarPorTexto, tamanhoDe } from "@/lib/modelos";
+import { cn, formatNumber } from "@/lib/utils";
 import type { StockRow } from "@/types";
 
 export type ProductOption = { id: string; nome: string; codigo: string; categoria: string; variants: StockRow[] };
@@ -18,35 +19,34 @@ export function groupProducts(variants: StockRow[]): ProductOption[] {
   return [...map.values()]; // já vem ordenado pelo banco (modelo e depois tamanho: PP, P, M, G, GG…)
 }
 
-/** Cada tamanho é um produto próprio no catálogo: com poucos resultados, os primeiros modelos escondiam os demais. */
-const MAX_RESULTADOS = 80;
+/** Cada tamanho é um produto próprio no catálogo: a lista mostra o MODELO com todos os tamanhos juntos. */
+const MAX_MODELOS = 30;
 
-const norm = (s: string) => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
-
-/** Busca com autocomplete ("jaqueta" → Jaqueta Operacional). Com o campo vazio lista os produtos para toque rápido. */
+/**
+ * Busca de uma peça (Saída): digite o nome (ou código), veja os modelos encontrados e toque no tamanho.
+ * Com o campo vazio só mostra a lista se o catálogo for pequeno.
+ */
 export function ProductSelector({
   products,
   value,
   onChange,
+  onPickVariant,
 }: {
   products: ProductOption[];
   value: string | null;
   onChange: (id: string | null) => void;
+  /** Escolheu um tamanho/variação específico na lista de modelos. */
+  onPickVariant?: (v: StockRow) => void;
 }) {
   const [q, setQ] = React.useState("");
   const selected = products.find((p) => p.id === value) ?? null;
+  const todas = React.useMemo(() => products.flatMap((p) => p.variants), [products]);
 
-  const matches = React.useMemo(() => {
-    const tokens = norm(q.trim()).split(/\s+/).filter(Boolean);
-    // catálogo grande: só lista após digitar; catálogo pequeno: mostra tudo para toque rápido
-    if (tokens.length === 0) return products.length <= 12 ? products : [];
-    return products
-      .filter((p) => {
-        const hay = norm(`${p.nome} ${p.codigo} ${categoryLabel(p.categoria)} ${p.variants.map((v) => v.sku).join(" ")}`);
-        return tokens.every((t) => hay.includes(t));
-      })
-      .slice(0, MAX_RESULTADOS);
-  }, [q, products]);
+  const grupos = React.useMemo(() => {
+    if (!q.trim()) return products.length <= 12 ? agruparPorModelo(todas) : [];
+    return agruparPorModelo(filtrarPorTexto(todas, q));
+  }, [q, products, todas]);
+  const visiveis = grupos.slice(0, MAX_MODELOS);
 
   if (selected) {
     return (
@@ -80,32 +80,43 @@ export function ProductSelector({
           type="search"
           value={q}
           onChange={(e) => setQ(e.target.value)}
-          placeholder="Digite o produto (ex.: jaqueta)"
+          placeholder="Digite o produto (ex.: camiseta pv mc orbenk azul)"
           aria-label="Buscar produto"
           autoComplete="off"
           className="h-14 w-full rounded-2xl border-2 border-slate-300 bg-white pl-12 pr-4 text-lg placeholder:text-slate-400 focus-visible:border-brand focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-orange-200"
         />
       </div>
-      <ul className="mt-2 grid max-h-[32rem] gap-2 overflow-y-auto sm:grid-cols-2" role="listbox" aria-label="Produtos encontrados">
-        {matches.map((p) => (
-          <li key={p.id} role="option" aria-selected={false}>
-            <button
-              type="button"
-              onClick={() => onChange(p.id)}
-              className={cn(
-                "flex min-h-16 w-full flex-col justify-center rounded-2xl border-2 border-slate-200 bg-white px-4 py-2 text-left hover:border-brand hover:bg-orange-50 active:scale-[0.99]",
-              )}
-            >
-              <span className="text-lg font-bold text-slate-900">{p.nome}</span>
-              <span className="text-sm text-slate-500">
-                {p.codigo}
-                {p.variants.length > 1 ? ` · ${p.variants.length} variações` : ""}
-              </span>
-            </button>
+      {q.trim() && grupos.length > 0 && (
+        <p className="mt-2 text-sm text-slate-600">
+          <strong>{formatNumber(grupos.length)}</strong> {grupos.length === 1 ? "modelo encontrado" : "modelos encontrados"}
+          {grupos.length > visiveis.length && <> · mostrando {visiveis.length} (digite mais palavras para refinar)</>}
+        </p>
+      )}
+      <ul className="mt-2 grid max-h-[34rem] gap-2 overflow-y-auto" aria-label="Modelos encontrados">
+        {visiveis.map((g) => (
+          <li key={g.prefixo} className="rounded-2xl border-2 border-slate-200 bg-white px-4 py-3">
+            <p className="text-lg font-bold text-slate-900">{g.nome}</p>
+            <p className="font-mono text-xs text-slate-500">{g.prefixo}</p>
+            <div className="mt-2 flex flex-wrap gap-2">
+              {g.itens.map((v) => (
+                <button
+                  key={v.variant_id}
+                  type="button"
+                  title={`${v.codigo} · ${formatNumber(v.estoque)} em estoque`}
+                  onClick={() => (onPickVariant ? onPickVariant(v) : onChange(v.product_id))}
+                  className={cn(
+                    "min-h-14 min-w-16 rounded-xl border-2 border-slate-300 bg-white px-3 py-1 text-center transition-colors hover:border-brand hover:bg-orange-50 active:scale-95",
+                  )}
+                >
+                  <span className="block text-base font-extrabold leading-tight">{tamanhoDe(v, g.nome)}</span>
+                  <span className={cn("block text-xs font-semibold tabular-nums", v.estoque > 0 ? "text-slate-500" : "text-red-600")}>{formatNumber(v.estoque)} un.</span>
+                </button>
+              ))}
+            </div>
           </li>
         ))}
-        {matches.length === 0 && (
-          <li className="px-2 py-4 text-slate-500 sm:col-span-2">
+        {visiveis.length === 0 && (
+          <li className="px-2 py-4 text-slate-500">
             {q.trim() ? `Nenhum produto encontrado para “${q}”.` : "Digite o nome ou o código do produto para buscar."}
           </li>
         )}

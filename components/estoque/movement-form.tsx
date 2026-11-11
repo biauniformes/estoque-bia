@@ -111,6 +111,13 @@ export function MovementForm({ tipo, variants, initialVariantId, isAdmin }: Prop
       setTamanho(ss.length === 1 ? ss[0].tamanho : null);
     } else setCor(null);
   }
+  /** Tamanho escolhido direto na lista de modelos: já define produto, cor e tamanho. */
+  function pickVariant(v: StockRow) {
+    touch();
+    setProductId(v.product_id);
+    setCor(v.cor);
+    setTamanho(v.tamanho);
+  }
   function pickCor(c: string) {
     touch();
     setCor(c);
@@ -211,7 +218,7 @@ export function MovementForm({ tipo, variants, initialVariantId, isAdmin }: Prop
   return (
     <div className="mx-auto max-w-3xl space-y-8">
       <Step n={1} title="Produto">
-        <ProductSelector products={products} value={productId} onChange={pickProduct} />
+        <ProductSelector products={products} value={productId} onChange={pickProduct} onPickVariant={pickVariant} />
         {errors.variantId && <p className="text-sm font-medium text-red-600">{errors.variantId}</p>}
       </Step>
 
